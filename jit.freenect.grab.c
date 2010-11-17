@@ -304,6 +304,7 @@ void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *de
 			out[3] = (float)in[3];
 			
 			out += 4;
+			in += 4;
 		}
 	}
 }
@@ -322,15 +323,16 @@ void copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest
 	
 	in = source;
 	
-	for(i=0;i<DEPTH_HEIGHT;i++){
+	for(i=0;i<RGB_HEIGHT;i++){
 		out = out_bp + dest_info->dimstride[1] * i;
-		for(j=0;j<DEPTH_WIDTH;j+=4){
-			out[0] = (float)in[0];
-			out[1] = (float)in[1];
-			out[2] = (float)in[2];
-			out[3] = (float)in[3];
+		for(j=0;j<RGB_WIDTH;j++){
+			out[0] = 0xFF;
+			out[1] = in[0];
+			out[2] = in[1];
+			out[3] = in[2];
 			
 			out += 4;
+			in += 3;
 		}
 	}
 }
