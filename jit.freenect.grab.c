@@ -142,7 +142,9 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 
 void jit_freenect_grab_free(t_jit_freenect_grab *x)
 {
-	//Nothing for now
+	if(x->device){
+		libusb_release_interface((libusb_device_handle *)x->device, 0);
+	}
 }
 
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
@@ -187,7 +189,20 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 
 void jit_freenect_close(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
+	int i;
 	//Device close not yet implemented in libfreenect - jmp 2010/11/17
+	if(x->device){
+		libusb_release_interface((libusb_device_handle *)x->device, 0);
+		
+		for(i=0;i<MAX_DEVICES;i++){
+			if(device_data[i].device == x->device){
+				device_data[i].device = NULL;
+				break;
+			}
+		}
+		
+		x->device = NULL;
+	}
 }
 
 t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs)

@@ -111,6 +111,9 @@
 			B4BFD6F6129502E300BACB4B /* PBXTextBookmark */ = B4BFD6F6129502E300BACB4B /* PBXTextBookmark */;
 			B4BFD6F7129502E300BACB4B /* PBXTextBookmark */ = B4BFD6F7129502E300BACB4B /* PBXTextBookmark */;
 			B4BFD6FA1295037900BACB4B /* PBXTextBookmark */ = B4BFD6FA1295037900BACB4B /* PBXTextBookmark */;
+			B4BFD701129506BF00BACB4B /* PBXTextBookmark */ = B4BFD701129506BF00BACB4B /* PBXTextBookmark */;
+			B4BFD703129506BF00BACB4B /* PBXTextBookmark */ = B4BFD703129506BF00BACB4B /* PBXTextBookmark */;
+			B4BFD704129506BF00BACB4B /* PBXTextBookmark */ = B4BFD704129506BF00BACB4B /* PBXTextBookmark */;
 		};
 		sourceControlManager = B4B4AEF21293DBD700B34CB3 /* Source Control */;
 		userBuildSettings = {
@@ -208,7 +211,7 @@
 		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
 		name = "jit.freenect.grab.c: 332";
 		rLen = 0;
-		rLoc = 10228;
+		rLoc = 10555;
 		rType = 0;
 		vrLen = 771;
 		vrLoc = 9360;
@@ -218,7 +221,7 @@
 		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
 		name = "jit.freenect.grab.c: 332";
 		rLen = 0;
-		rLoc = 10228;
+		rLoc = 10555;
 		rType = 0;
 		vrLen = 1027;
 		vrLoc = 5190;
@@ -301,9 +304,9 @@
 	};
 	B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */ = {
 		uiCtxt = {
-			sepNavIntBoundsRect = "{{0, 0}, {1107, 5044}}";
-			sepNavSelRange = "{9321, 0}";
-			sepNavVisRange = "{8964, 959}";
+			sepNavIntBoundsRect = "{{0, 0}, {1125, 4901}}";
+			sepNavSelRange = "{5036, 0}";
+			sepNavVisRange = "{4442, 914}";
 		};
 	};
 	B4B4AEF51293DBE600B34CB3 /* max.jit.freenect.grab.c */ = {
@@ -353,7 +356,7 @@
 		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
 		name = "jit.freenect.grab.c: 332";
 		rLen = 0;
-		rLoc = 10228;
+		rLoc = 10555;
 		rType = 0;
 		vrLen = 1047;
 		vrLoc = 5179;
@@ -363,7 +366,7 @@
 		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
 		name = "jit.freenect.grab.c: 332";
 		rLen = 0;
-		rLoc = 10228;
+		rLoc = 10555;
 		rType = 0;
 		vrLen = 1047;
 		vrLoc = 5179;
@@ -686,7 +689,7 @@
 		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
 		name = "jit.freenect.grab.c: 307";
 		rLen = 0;
-		rLoc = 9631;
+		rLoc = 9958;
 		rType = 0;
 		vrLen = 853;
 		vrLoc = 9166;
@@ -767,7 +770,7 @@
 		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
 		name = "jit.freenect.grab.c: 304";
 		rLen = 2;
-		rLoc = 9466;
+		rLoc = 9793;
 		rType = 0;
 		vrLen = 814;
 		vrLoc = 9096;
@@ -777,7 +780,7 @@
 		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
 		name = "jit.freenect.grab.c: 303";
 		rLen = 0;
-		rLoc = 9437;
+		rLoc = 9764;
 		rType = 0;
 		vrLen = 956;
 		vrLoc = 9056;
@@ -787,9 +790,45 @@
 		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
 		name = "jit.freenect.grab.c: 300";
 		rLen = 0;
-		rLoc = 9321;
+		rLoc = 9648;
 		rType = 0;
 		vrLen = 959;
 		vrLoc = 8964;
+	};
+	B4BFD701129506BF00BACB4B /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = B4BFD702129506BF00BACB4B /* libusb.h */;
+		name = "libusb.h: 876";
+		rLen = 68;
+		rLoc = 27558;
+		rType = 0;
+		vrLen = 1762;
+		vrLoc = 26902;
+	};
+	B4BFD702129506BF00BACB4B /* libusb.h */ = {
+		isa = PBXFileReference;
+		name = libusb.h;
+		path = "/usr/local/include/libusb-1.0/libusb.h";
+		sourceTree = "<absolute>";
+	};
+	B4BFD703129506BF00BACB4B /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
+		name = "jit.freenect.grab.c: 195";
+		rLen = 24;
+		rLoc = 6146;
+		rType = 0;
+		vrLen = 1032;
+		vrLoc = 5604;
+	};
+	B4BFD704129506BF00BACB4B /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */;
+		name = "jit.freenect.grab.c: 146";
+		rLen = 0;
+		rLoc = 5036;
+		rType = 0;
+		vrLen = 914;
+		vrLoc = 4442;
 	};
 }
