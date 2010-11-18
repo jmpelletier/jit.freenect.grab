@@ -10,7 +10,6 @@
 		8D01CCCE0486CAD60068D4B7 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */; };
 		B436001C1293FD6B00228EA0 /* MaxAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B436001B1293FD6B00228EA0 /* MaxAPI.framework */; };
 		B43600621293FD7500228EA0 /* JitterAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B43600611293FD7500228EA0 /* JitterAPI.framework */; };
-		B43600A11293FE6E00228EA0 /* libusb-1.0.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B43600A01293FE6E00228EA0 /* libusb-1.0.a */; };
 		B43600C71294058400228EA0 /* inits.c in Sources */ = {isa = PBXBuildFile; fileRef = B43600C61294058400228EA0 /* inits.c */; };
 		B436FF581293F4EF00228EA0 /* cameras.c in Sources */ = {isa = PBXBuildFile; fileRef = B436FF531293F4EF00228EA0 /* cameras.c */; };
 		B436FF591293F4EF00228EA0 /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = B436FF541293F4EF00228EA0 /* core.c */; };
@@ -19,13 +18,14 @@
 		B436FF5C1293F4EF00228EA0 /* usb_libusb10.h in Headers */ = {isa = PBXBuildFile; fileRef = B436FF571293F4EF00228EA0 /* usb_libusb10.h */; };
 		B4B4AEF61293DBE600B34CB3 /* jit.freenect.grab.c in Sources */ = {isa = PBXBuildFile; fileRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */; };
 		B4B4AEF71293DBE600B34CB3 /* max.jit.freenect.grab.c in Sources */ = {isa = PBXBuildFile; fileRef = B4B4AEF51293DBE600B34CB3 /* max.jit.freenect.grab.c */; };
+		B4BFD6B51294CE0400BACB4B /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B4BFD6B41294CE0400BACB4B /* IOKit.framework */; };
+		B4BFD6DC1294CF8300BACB4B /* libusb32-1.0.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B4BFD6DB1294CF8300BACB4B /* libusb32-1.0.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = /System/Library/Frameworks/Carbon.framework; sourceTree = "<absolute>"; };
 		B436001B1293FD6B00228EA0 /* MaxAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = MaxAPI.framework; sourceTree = "<group>"; };
 		B43600611293FD7500228EA0 /* JitterAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JitterAPI.framework; path = "../c74support/jit-includes/JitterAPI.framework"; sourceTree = SOURCE_ROOT; };
-		B43600A01293FE6E00228EA0 /* libusb-1.0.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libusb-1.0.a"; path = "/usr/local/lib/libusb-1.0.a"; sourceTree = "<absolute>"; };
 		B43600C61294058400228EA0 /* inits.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = inits.c; path = ../libfreenect/c/lib/inits.c; sourceTree = SOURCE_ROOT; };
 		B436FF531293F4EF00228EA0 /* cameras.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cameras.c; path = ../libfreenect/c/lib/cameras.c; sourceTree = SOURCE_ROOT; };
 		B436FF541293F4EF00228EA0 /* core.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = core.c; path = ../libfreenect/c/lib/core.c; sourceTree = SOURCE_ROOT; };
@@ -35,6 +35,8 @@
 		B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = jit.freenect.grab.c; sourceTree = "<group>"; };
 		B4B4AEF51293DBE600B34CB3 /* max.jit.freenect.grab.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = max.jit.freenect.grab.c; sourceTree = "<group>"; };
 		B4B4AEF81293DBE600B34CB3 /* jit.freenect.grab.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = jit.freenect.grab.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4BFD6B41294CE0400BACB4B /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = /System/Library/Frameworks/IOKit.framework; sourceTree = "<absolute>"; };
+		B4BFD6DB1294CF8300BACB4B /* libusb32-1.0.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libusb32-1.0.a"; path = "lib/libusb32-1.0.a"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,7 +47,8 @@
 				8D01CCCE0486CAD60068D4B7 /* Carbon.framework in Frameworks */,
 				B436001C1293FD6B00228EA0 /* MaxAPI.framework in Frameworks */,
 				B43600621293FD7500228EA0 /* JitterAPI.framework in Frameworks */,
-				B43600A11293FE6E00228EA0 /* libusb-1.0.a in Frameworks */,
+				B4BFD6B51294CE0400BACB4B /* IOKit.framework in Frameworks */,
+				B4BFD6DC1294CF8300BACB4B /* libusb32-1.0.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -67,10 +70,11 @@
 		089C1671FE841209C02AAC07 /* External Frameworks and Libraries */ = {
 			isa = PBXGroup;
 			children = (
-				B43600A01293FE6E00228EA0 /* libusb-1.0.a */,
+				B4BFD6DB1294CF8300BACB4B /* libusb32-1.0.a */,
 				B43600611293FD7500228EA0 /* JitterAPI.framework */,
 				B436001B1293FD6B00228EA0 /* MaxAPI.framework */,
 				08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */,
+				B4BFD6B41294CE0400BACB4B /* IOKit.framework */,
 			);
 			name = "External Frameworks and Libraries";
 			sourceTree = "<group>";
@@ -225,11 +229,16 @@
 				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_2 = "\"$(SRCROOT)/../c74support/jit-includes\"";
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_ENABLE_SSE3_EXTENSIONS = YES;
+				GCC_ENABLE_SSE41_EXTENSIONS = YES;
+				GCC_ENABLE_SSE42_EXTENSIONS = YES;
+				GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS = YES;
 				GCC_ENABLE_TRIGRAPHS = NO;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "../c74support/max-includes/macho-prefix.pch";
+				GCC_UNROLL_LOOPS = YES;
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = NO;
 				GCC_WARN_FOUR_CHARACTER_CONSTANTS = NO;
 				GCC_WARN_UNKNOWN_PRAGMAS = NO;
@@ -248,10 +257,14 @@
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_6 = "\"$(SRCROOT)/../libfreenect/c/include\"";
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = /build/development/;
-				LIBRARY_SEARCH_PATHS = "";
+				LIBRARY_SEARCH_PATHS = "\"$(SRCROOT)/lib\"";
 				LIBRARY_STYLE = Bundle;
 				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "-lmx";
+				OTHER_LDFLAGS = (
+					"-Wl",
+					"-search_paths_first",
+					"-lmx",
+				);
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = jit.freenect.grab;
 				SDKROOT = "";
@@ -304,10 +317,14 @@
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_6 = "\"$(SRCROOT)/../libfreenect/c/include\"";
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = /build/deployment/;
-				LIBRARY_SEARCH_PATHS = "";
+				LIBRARY_SEARCH_PATHS = "\"$(SRCROOT)/lib\"";
 				LIBRARY_STYLE = Bundle;
 				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "-lmx";
+				OTHER_LDFLAGS = (
+					"-Wl",
+					"-search_paths_first",
+					"-lmx",
+				);
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = jit.freenect.grab;
 				SDKROOT = "";
@@ -358,10 +375,14 @@
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_6 = "\"$(SRCROOT)/../libfreenect/c/include\"";
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "/../../../sysbuild/$(CONFIGURATION)/Cycling '74/jitter-externals";
-				LIBRARY_SEARCH_PATHS = "";
+				LIBRARY_SEARCH_PATHS = "\"$(SRCROOT)/lib\"";
 				LIBRARY_STYLE = Bundle;
 				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "-lmx";
+				OTHER_LDFLAGS = (
+					"-Wl",
+					"-search_paths_first",
+					"-lmx",
+				);
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = jit.freenect.grab;
 				SDKROOT = "";

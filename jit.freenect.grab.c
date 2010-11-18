@@ -74,14 +74,13 @@ int device_count = 0;
 
 t_jit_err jit_freenect_grab_init(void)
 {
-	long attrflags=0;
+	//long attrflags=0;
 	int i;
-	t_jit_object *attr,*mop,*output;
+	//t_jit_object *attr;
+	t_jit_object *mop,*output;
 	t_atom a[1];
 	
-	_jit_freenect_grab_class =
-	jit_class_new("jit_freenect_grab",(method)jit_freenect_grab_new,(method)jit_freenect_grab_free,
-				  sizeof(t_jit_freenect_grab),0L);
+	_jit_freenect_grab_class = jit_class_new("jit_freenect_grab",(method)jit_freenect_grab_new,(method)jit_freenect_grab_free, sizeof(t_jit_freenect_grab),0L);
   	
 	//add mop
 	mop = (t_jit_object *)jit_object_new(_jit_sym_jit_mop,0,2); //0inputs, 2 outputs
@@ -150,10 +149,12 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 {
 	int i;
 	if(x->device){ //Already initialized
+		post("A device is already open.");
 		return;
 	}
 	
 	if(device_count == (MAX_DEVICES - 1)){
+		post("Reached maximum number of simultaneous devices.");
 		return;
 	}
 	
@@ -283,7 +284,7 @@ out:
 void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info)
 {
 	int i,j;
-	//float4 vec; <-- for later
+	float4 vec_a, vec_b;
 	
 	float *out;
 	freenect_depth *in;
@@ -298,10 +299,14 @@ void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *de
 	for(i=0;i<DEPTH_HEIGHT;i++){
 		out = (float *)(out_bp + dest_info->dimstride[1] * i);
 		for(j=0;j<DEPTH_WIDTH;j+=4){
-			out[0] = (float)in[0];
-			out[1] = (float)in[1];
-			out[2] = (float)in[2];
-			out[3] = (float)in[3];
+			vec_a[0] = (float)in[0];
+			vec_a[1] = (float)in[1];
+			vec_a[2] = (float)in[2];
+			vec_a[3] = (float)in[3];
+			
+			//The macros below are to ensure that the multiplication is vectorized (SSE)
+			mult_scalar_float4(vec_a, (1.f / (float)0x7FF), vec_b); //Kinect depth is 11 bits in a 16-bit short, normalize to 0-1
+			copy_float4(out, vec_b);
 			
 			out += 4;
 			in += 4;
