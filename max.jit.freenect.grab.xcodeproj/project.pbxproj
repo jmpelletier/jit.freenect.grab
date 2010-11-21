@@ -16,10 +16,15 @@
 		B436FF5A1293F4EF00228EA0 /* freenect_internal.h in Headers */ = {isa = PBXBuildFile; fileRef = B436FF551293F4EF00228EA0 /* freenect_internal.h */; };
 		B436FF5B1293F4EF00228EA0 /* usb_libusb10.c in Sources */ = {isa = PBXBuildFile; fileRef = B436FF561293F4EF00228EA0 /* usb_libusb10.c */; };
 		B436FF5C1293F4EF00228EA0 /* usb_libusb10.h in Headers */ = {isa = PBXBuildFile; fileRef = B436FF571293F4EF00228EA0 /* usb_libusb10.h */; };
+		B4793DA51299030800A44AF1 /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = B4793DA11299030800A44AF1 /* core.c */; };
+		B4793DA61299030800A44AF1 /* descriptor.c in Sources */ = {isa = PBXBuildFile; fileRef = B4793DA21299030800A44AF1 /* descriptor.c */; };
+		B4793DA71299030800A44AF1 /* io.c in Sources */ = {isa = PBXBuildFile; fileRef = B4793DA31299030800A44AF1 /* io.c */; };
+		B4793DA81299030800A44AF1 /* sync.c in Sources */ = {isa = PBXBuildFile; fileRef = B4793DA41299030800A44AF1 /* sync.c */; };
+		B4793DB31299035F00A44AF1 /* config.h in Headers */ = {isa = PBXBuildFile; fileRef = B4793DB21299035F00A44AF1 /* config.h */; };
+		B4793DDA129904AC00A44AF1 /* darwin_usb.c in Sources */ = {isa = PBXBuildFile; fileRef = B4793DD9129904AC00A44AF1 /* darwin_usb.c */; };
 		B4B4AEF61293DBE600B34CB3 /* jit.freenect.grab.c in Sources */ = {isa = PBXBuildFile; fileRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */; };
 		B4B4AEF71293DBE600B34CB3 /* max.jit.freenect.grab.c in Sources */ = {isa = PBXBuildFile; fileRef = B4B4AEF51293DBE600B34CB3 /* max.jit.freenect.grab.c */; };
 		B4BFD6B51294CE0400BACB4B /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B4BFD6B41294CE0400BACB4B /* IOKit.framework */; };
-		B4BFD6DC1294CF8300BACB4B /* libusb32-1.0.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B4BFD6DB1294CF8300BACB4B /* libusb32-1.0.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,11 +37,16 @@
 		B436FF551293F4EF00228EA0 /* freenect_internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = freenect_internal.h; path = ../libfreenect/c/lib/freenect_internal.h; sourceTree = SOURCE_ROOT; };
 		B436FF561293F4EF00228EA0 /* usb_libusb10.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = usb_libusb10.c; path = ../libfreenect/c/lib/usb_libusb10.c; sourceTree = SOURCE_ROOT; };
 		B436FF571293F4EF00228EA0 /* usb_libusb10.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = usb_libusb10.h; path = ../libfreenect/c/lib/usb_libusb10.h; sourceTree = SOURCE_ROOT; };
+		B4793DA11299030800A44AF1 /* core.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = core.c; path = ../libusb/libusb/core.c; sourceTree = SOURCE_ROOT; };
+		B4793DA21299030800A44AF1 /* descriptor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = descriptor.c; path = ../libusb/libusb/descriptor.c; sourceTree = SOURCE_ROOT; };
+		B4793DA31299030800A44AF1 /* io.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = io.c; path = ../libusb/libusb/io.c; sourceTree = SOURCE_ROOT; };
+		B4793DA41299030800A44AF1 /* sync.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = sync.c; path = ../libusb/libusb/sync.c; sourceTree = SOURCE_ROOT; };
+		B4793DB21299035F00A44AF1 /* config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = config.h; path = ../libusb/config.h; sourceTree = SOURCE_ROOT; };
+		B4793DD9129904AC00A44AF1 /* darwin_usb.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = darwin_usb.c; path = ../libusb/libusb/os/darwin_usb.c; sourceTree = SOURCE_ROOT; };
 		B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = jit.freenect.grab.c; sourceTree = "<group>"; };
 		B4B4AEF51293DBE600B34CB3 /* max.jit.freenect.grab.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = max.jit.freenect.grab.c; sourceTree = "<group>"; };
 		B4B4AEF81293DBE600B34CB3 /* jit.freenect.grab.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = jit.freenect.grab.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4BFD6B41294CE0400BACB4B /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = /System/Library/Frameworks/IOKit.framework; sourceTree = "<absolute>"; };
-		B4BFD6DB1294CF8300BACB4B /* libusb32-1.0.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libusb32-1.0.a"; path = "lib/libusb32-1.0.a"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,7 +58,6 @@
 				B436001C1293FD6B00228EA0 /* MaxAPI.framework in Frameworks */,
 				B43600621293FD7500228EA0 /* JitterAPI.framework in Frameworks */,
 				B4BFD6B51294CE0400BACB4B /* IOKit.framework in Frameworks */,
-				B4BFD6DC1294CF8300BACB4B /* libusb32-1.0.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -58,6 +67,7 @@
 		089C166AFE841209C02AAC07 /* atanh */ = {
 			isa = PBXGroup;
 			children = (
+				B4793D9B129902F000A44AF1 /* libusb source */,
 				B4B4AF031293DC7C00B34CB3 /* freenect source */,
 				08FB77ADFE841716C02AAC07 /* Source */,
 				089C167CFE841241C02AAC07 /* Resources */,
@@ -70,7 +80,6 @@
 		089C1671FE841209C02AAC07 /* External Frameworks and Libraries */ = {
 			isa = PBXGroup;
 			children = (
-				B4BFD6DB1294CF8300BACB4B /* libusb32-1.0.a */,
 				B43600611293FD7500228EA0 /* JitterAPI.framework */,
 				B436001B1293FD6B00228EA0 /* MaxAPI.framework */,
 				08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */,
@@ -103,6 +112,19 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		B4793D9B129902F000A44AF1 /* libusb source */ = {
+			isa = PBXGroup;
+			children = (
+				B4793DD9129904AC00A44AF1 /* darwin_usb.c */,
+				B4793DB21299035F00A44AF1 /* config.h */,
+				B4793DA11299030800A44AF1 /* core.c */,
+				B4793DA21299030800A44AF1 /* descriptor.c */,
+				B4793DA31299030800A44AF1 /* io.c */,
+				B4793DA41299030800A44AF1 /* sync.c */,
+			);
+			name = "libusb source";
+			sourceTree = "<group>";
+		};
 		B4B4AF031293DC7C00B34CB3 /* freenect source */ = {
 			isa = PBXGroup;
 			children = (
@@ -125,6 +147,7 @@
 			files = (
 				B436FF5A1293F4EF00228EA0 /* freenect_internal.h in Headers */,
 				B436FF5C1293F4EF00228EA0 /* usb_libusb10.h in Headers */,
+				B4793DB31299035F00A44AF1 /* config.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -206,6 +229,11 @@
 				B436FF591293F4EF00228EA0 /* core.c in Sources */,
 				B436FF5B1293F4EF00228EA0 /* usb_libusb10.c in Sources */,
 				B43600C71294058400228EA0 /* inits.c in Sources */,
+				B4793DA51299030800A44AF1 /* core.c in Sources */,
+				B4793DA61299030800A44AF1 /* descriptor.c in Sources */,
+				B4793DA71299030800A44AF1 /* io.c in Sources */,
+				B4793DA81299030800A44AF1 /* sync.c in Sources */,
+				B4793DDA129904AC00A44AF1 /* darwin_usb.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -244,17 +272,15 @@
 				GCC_WARN_UNKNOWN_PRAGMAS = NO;
 				GENERATE_PKGINFO_FILE = YES;
 				HEADER_SEARCH_PATHS = (
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_4)",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_5)",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_6)",
+					"$(SRCROOT)/../libfreenect/c/include",
 					"/usr/local/include/libusb-1.0/",
+					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
+					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_2)",
+					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_3)",
 				);
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../OpenKinect-libfreenect/c/include\"";
+				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../libusb/libusb\"";
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_2 = "\"$(SRCROOT)/../c74support/jit-includes\"";
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_3 = "\"$(SRCROOT)/../c74support/max-includes\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_4 = "\"$(SRCROOT)/../c74support/max-includes\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_5 = "\"$(SRCROOT)/../c74support/jit-includes\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_6 = "\"$(SRCROOT)/../libfreenect/c/include\"";
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = /build/development/;
 				LIBRARY_SEARCH_PATHS = "\"$(SRCROOT)/lib\"";
