@@ -1,5 +1,5 @@
 /*
- Copyright 2010, Jean-Marc Pelletier
+ Copyright 2010, Jean-Marc Pelletier, nesa and cap10subtext 
  jmp@jmpelletier.com
  
  This file is part of jit.freenect.grab.
@@ -45,6 +45,7 @@ typedef struct _jit_freenect_grab
 {
 	t_object		ob;
 	char unique;
+	char mode;
 	freenect_device *device;
 	uint32_t timestamp;
 } t_jit_freenect_grab;
@@ -199,6 +200,9 @@ t_jit_err jit_freenect_grab_init(void)
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"unique",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,unique));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,mode));
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
 	jit_class_register(_jit_freenect_grab_class);
 	
 	for(i=0;i<MAX_DEVICES;i++){
@@ -228,6 +232,7 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->device = NULL;
 		x->timestamp = 0;
 		x->unique = 0;
+		x->mode = 0;
 		
 		if(object_count == 0){
 			if(pthread_mutex_init(&mutex, NULL)){
