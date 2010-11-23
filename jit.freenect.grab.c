@@ -22,6 +22,7 @@
 #include "jit.common.h"
 #include <libusb.h>
 #include "libfreenect.h"
+#include <time.h>
 //#include "usb_libusb10.h"
 
 typedef float float4[4];
@@ -46,6 +47,7 @@ typedef struct _jit_freenect_grab
 	t_object		ob;
 	char unique;
 	char mode;
+	char has_frames;
 	freenect_device *device;
 	uint32_t timestamp;
 } t_jit_freenect_grab;
@@ -56,7 +58,9 @@ typedef struct _grab_data
 	freenect_depth *depth_data;
 	freenect_device *device;
 	uint32_t index;
-	uint32_t timestamp;
+	uint32_t rgb_timestamp;
+	uint32_t depth_timestamp;
+	char have_frames;
 } t_grab_data;
 
 enum thread_mess_type{
@@ -101,9 +105,6 @@ void *capture_threadfunc(void *arg)
 	freenect_context *f_ctx = NULL;
 	freenect_device *f_dev = NULL;
 	
-	//printf("Entering grabber thread.\n");
-	//post("Thread in.");
-	
 	if (freenect_init(&f_ctx, NULL) < 0) {
 		printf("freenect_init() failed\n");
 		goto out;
@@ -132,7 +133,7 @@ void *capture_threadfunc(void *arg)
 			done = 1;
 			message.type = NONE;
 		}
-		pthread_mutex_unlock(&mutex);
+		pthread_mutex_unlock(&mutex);		
 	}
 
 out:
@@ -161,12 +162,12 @@ t_jit_err jit_freenect_grab_init(void)
 	int i;
 	t_jit_object *attr;
 	t_jit_object *mop,*output;
-	t_atom a[1];
+	t_atom a[2];
 	
 	_jit_freenect_grab_class = jit_class_new("jit_freenect_grab",(method)jit_freenect_grab_new,(method)jit_freenect_grab_free, sizeof(t_jit_freenect_grab),0L);
   	
 	//add mop
-	mop = (t_jit_object *)jit_object_new(_jit_sym_jit_mop,0,2); //0inputs, 2 outputs
+	mop = (t_jit_object *)jit_object_new(_jit_sym_jit_mop,0,2); //0 inputs, 2 outputs
 	
 	//Prepare depth image, all values are hard-coded, may need to be queried for safety?
 	output = jit_object_method(mop,_jit_sym_getoutput,1);
@@ -177,6 +178,12 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	
+	jit_atom_setlong(&a[0], DEPTH_WIDTH);
+	jit_atom_setlong(&a[1], DEPTH_HEIGHT);
+	
+	jit_object_method(output, _jit_sym_mindim, 2, a);  //Two dimensions, sizes in atom array
+	jit_object_method(output, _jit_sym_maxdim, 2, a);
+		
 	//Prepare RGB image
 	output = jit_object_method(mop,_jit_sym_getoutput,2);
 	
@@ -185,6 +192,12 @@ t_jit_err jit_freenect_grab_init(void)
 	
 	jit_attr_setlong(output,_jit_sym_minplanecount,4);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,4);
+	
+	jit_atom_setlong(&a[0], RGB_WIDTH);
+	jit_atom_setlong(&a[1], RGB_HEIGHT);
+	
+	jit_object_method(output, _jit_sym_mindim, 2, a);
+	jit_object_method(output, _jit_sym_maxdim, 2, a);
 	
 	jit_class_addadornment(_jit_freenect_grab_class,mop);
 	
@@ -201,6 +214,10 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,mode));
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
+	attrflags = JIT_ATTR_GET_OPAQUE_USER | JIT_ATTR_SET_OPAQUE_USER;
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"has_frames",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,has_frames));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	jit_class_register(_jit_freenect_grab_class);
@@ -233,6 +250,7 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->timestamp = 0;
 		x->unique = 0;
 		x->mode = 0;
+		x->has_frames = 0;
 		
 		if(object_count == 0){
 			if(pthread_mutex_init(&mutex, NULL)){
@@ -284,9 +302,9 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 	void *depth_matrix,*rgb_matrix;
 	char *depth_bp, *rgb_bp;
 	int i;
-	
-	depth_matrix = jit_object_method(outputs,_jit_sym_getindex,0);
-	rgb_matrix = jit_object_method(outputs,_jit_sym_getindex,1);
+			
+	depth_matrix = jit_object_method(outputs,_jit_sym_getindex,0); 
+	rgb_matrix = jit_object_method(outputs,_jit_sym_getindex,1); 
 	
 	if (x && depth_matrix && rgb_matrix) {
 		
@@ -309,21 +327,10 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 		}
 		
 		if ((depth_minfo.dim[0] != DEPTH_WIDTH) || (depth_minfo.dim[1] != DEPTH_HEIGHT) ||
-			(rgb_minfo.dim[0] != RGB_WIDTH) || (rgb_minfo.dim[1] != RGB_HEIGHT))
+			(rgb_minfo.dim[0] != RGB_WIDTH) || (rgb_minfo.dim[1] != RGB_HEIGHT)) //overkill, but you can never be too sure
 		{
-			depth_minfo.dimcount = 2;
-			depth_minfo.dim[0] = DEPTH_WIDTH;
-			depth_minfo.dim[1] = DEPTH_HEIGHT;
-			rgb_minfo.dimcount = 2;
-			rgb_minfo.dim[0] = RGB_WIDTH;
-			rgb_minfo.dim[1] = RGB_HEIGHT;
-			
-			jit_object_method(depth_matrix,_jit_sym_setinfo,&depth_minfo);
-			jit_object_method(rgb_matrix,_jit_sym_setinfo,&rgb_minfo);
-			
-			jit_object_method(depth_matrix,_jit_sym_getinfo,&depth_minfo);
-			jit_object_method(rgb_matrix,_jit_sym_getinfo,&rgb_minfo);
-			
+			err=JIT_ERR_MISMATCH_DIM;
+			goto out;
 		}
 		
 		if ((depth_minfo.dimcount != 2) || (rgb_minfo.dimcount != 2)) //overkill, but you can never be too sure
@@ -337,6 +344,7 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 		
 		jit_object_method(rgb_matrix,_jit_sym_getdata,&rgb_bp);
 		if (!rgb_bp) { err=JIT_ERR_INVALID_OUTPUT; goto out;}
+		 
 		
 		//TODO: Fix multi-camera support  - jmp 2010/11/21
 		//Grab and copy matrices  
@@ -354,13 +362,22 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 		}
 		 */
 		
-		//TODO: implement "unique" mode as in jit.qt.grab  - jmp 2010/11/21
+				
+		x->has_frames = 0;
+						
 		if(device_data[0].device){
-			x->timestamp = device_data[0].timestamp;
-			
-			//TODO: it might be worth sending this to their own threads for performance - jmp
-			copy_depth_data(device_data[0].depth_data, depth_bp, &depth_minfo);
-			copy_rgb_data(device_data[0].rgb_data, rgb_bp, &rgb_minfo);
+			if(device_data[0].have_frames > 1){
+				pthread_mutex_lock(&mutex);
+				device_data[0].have_frames = 0;
+				pthread_mutex_unlock(&mutex);
+				
+				x->timestamp = MAX(device_data[0].rgb_timestamp,device_data[0].depth_timestamp);
+				x->has_frames = 1;
+				
+				//TODO: it might be worth sending this to their own threads for performance - jmp
+				copy_depth_data(device_data[0].depth_data, depth_bp, &depth_minfo);
+				copy_rgb_data(device_data[0].rgb_data, rgb_bp, &rgb_minfo);
+			}
 		}
 		
 	} else {
@@ -381,7 +398,11 @@ void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *de
 	float *out;
 	freenect_depth *in;
 	
-	if(!source || !out_bp || !dest_info){
+	if(!source){
+		return;	
+	}
+	
+	if(!out_bp || !dest_info){
 		error("Invalid pointer in copy_depth_data.");
 		return;
 	}
@@ -414,7 +435,11 @@ void copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest
 	char *out;
 	freenect_pixel *in;
 	
-	if(!source || !out_bp || !dest_info){
+	if(!source){
+		return;
+	}
+	
+	if(!out_bp || !dest_info){
 		error("Invalid pointer in copy_depth_data.");
 		return;
 	}
@@ -441,7 +466,8 @@ void rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timesta
 		if(device_data[i].device == dev){
 			pthread_mutex_lock(&mutex);
 			device_data[i].rgb_data = pixels;
-			device_data[i].timestamp = timestamp;
+			device_data[i].rgb_timestamp = timestamp;
+			device_data[i].have_frames++;
 			pthread_mutex_unlock(&mutex);
 			break;
 		}
@@ -454,7 +480,8 @@ void depth_callback(freenect_device *dev, freenect_depth *pixels, uint32_t times
 		if(device_data[i].device == dev){
 			pthread_mutex_lock(&mutex);
 			device_data[i].depth_data = pixels;
-			device_data[i].timestamp = timestamp;
+			device_data[i].depth_timestamp = timestamp;
+			device_data[i].have_frames++;
 			pthread_mutex_unlock(&mutex);
 			break;
 		}
