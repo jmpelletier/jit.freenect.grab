@@ -41,6 +41,9 @@ typedef char char16[16];
 #define copy_char16(a,b) {int vector_iterator;for(vector_iterator=0;vector_iterator<16;vector_iterator++)b[vector_iterator] = a[vector_iterator];}
 
 #define mult_scalar_float4(a,b,c) {int vector_iterator;for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator]= a[vector_iterator] * b;}
+#define add_scalar_float4(a,b,c) {int vector_iterator; for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator] = a[vector_iterator] + b;}
+#define div_scalar_float4_inv(a,b,c) {int vector_iterator; for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator] = b / a[vector_iterator];}
+#define sub_float4(a,b,c) {int vector_iterator; for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator] = a[vector_iterator] - b[vector_iterator];}
 
 typedef struct _jit_freenect_grab
 {
@@ -48,6 +51,7 @@ typedef struct _jit_freenect_grab
 	char unique;
 	char mode;
 	char has_frames;
+	long index;
 	freenect_device *device;
 	uint32_t timestamp;
 } t_jit_freenect_grab;
@@ -85,7 +89,7 @@ void					jit_freenect_open(t_jit_freenect_grab *x, t_symbol *s, long argc, t_ato
 void					jit_freenect_close(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
 void					rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp);
 void					depth_callback(freenect_device *dev, freenect_depth *pixels, uint32_t timestamp);
-void					copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info);
+void					copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, int mode);
 void					copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest_info);
 
 
@@ -102,6 +106,7 @@ int object_count = 0;
 void *capture_threadfunc(void *arg)
 {
 	int done = 0;
+	int device_count = 0;
 	freenect_context *f_ctx = NULL;
 	freenect_device *f_dev = NULL;
 	
@@ -109,33 +114,51 @@ void *capture_threadfunc(void *arg)
 		printf("freenect_init() failed\n");
 		goto out;
 	}
-	
-	if (freenect_open_device(f_ctx, &f_dev, 0) < 0) {
-		printf("Could not open device\n");
-		goto out;
-	}
-	
-	freenect_set_depth_callback(f_dev, depth_callback);
-	freenect_set_rgb_callback(f_dev, rgb_callback);
-	freenect_set_rgb_format(f_dev, FREENECT_FORMAT_RGB);
-	
-	freenect_start_depth(f_dev);
-	freenect_start_rgb(f_dev);
-	
-	pthread_mutex_lock(&mutex);
-	device_data[0].device = f_dev;
-	device_data[0].index = 0;
-	pthread_mutex_unlock(&mutex);
-	
-	while(!done && freenect_process_events(f_ctx) >= 0){
+		
+	while(!done){
+		if(device_count > 0){
+			if(freenect_process_events(f_ctx) < 0){
+				break;
+			}
+		}
+		
 		pthread_mutex_lock(&mutex);
+		
 		if(message.type == TERMINATE){
 			done = 1;
 			message.type = NONE;
 		}
-		pthread_mutex_unlock(&mutex);		
+		else if(message.type == OPEN){
+			t_jit_freenect_grab *x;
+			
+			printf("Opening device.\n");
+			post("Opening device.");
+			if (freenect_open_device(f_ctx, &f_dev, 0) < 0) {  //<-- index does not appear to be implemented yet in libfreenect - jmp
+				printf("Could not open device\n");
+				goto out;
+			}
+			
+			freenect_set_depth_callback(f_dev, depth_callback);
+			freenect_set_rgb_callback(f_dev, rgb_callback);
+			freenect_set_rgb_format(f_dev, FREENECT_FORMAT_RGB);
+			
+			freenect_start_depth(f_dev);
+			freenect_start_rgb(f_dev);
+			
+			device_data[0].device = f_dev; //<-- index does not appear to be implemented yet in libfreenect - jmp
+			device_data[0].index = 0; //<-- index does not appear to be implemented yet in libfreenect - jmp
+			
+			device_count++;
+			
+			x = message.data;
+			x->device = f_dev;
+			
+			message.type = NONE;	
+		}
+		
+		pthread_mutex_unlock(&mutex);
 	}
-
+	
 out:
 	//printf("Exiting grabber thread.\n");
 	
@@ -216,6 +239,10 @@ t_jit_err jit_freenect_grab_init(void)
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,mode));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
+	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_OPAQUE;
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"index",_jit_sym_long,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,index));
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
 	attrflags = JIT_ATTR_GET_OPAQUE_USER | JIT_ATTR_SET_OPAQUE_USER;
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"has_frames",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,has_frames));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
@@ -285,7 +312,17 @@ void jit_freenect_grab_free(t_jit_freenect_grab *x)
 
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
-	//TODO, close/start is automatic on object destruction/creation for now,  jmp 2010/11/21
+	post("Trying to open device.");
+	if(!argc){
+		x->index = 0;	
+	}
+	else{
+		x->index = jit_atom_getlong(argv);
+	}
+	pthread_mutex_lock(&mutex);
+	message.type = OPEN;
+	message.data = x;
+	pthread_mutex_unlock(&mutex);
 	
 }
 
@@ -345,38 +382,22 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 		jit_object_method(rgb_matrix,_jit_sym_getdata,&rgb_bp);
 		if (!rgb_bp) { err=JIT_ERR_INVALID_OUTPUT; goto out;}
 		 
-		
-		//TODO: Fix multi-camera support  - jmp 2010/11/21
-		//Grab and copy matrices  
-		/*
+		//Grab and copy matrices
+		x->has_frames = 0;  //Assume there are no new frames
 		for(i=0;i<MAX_DEVICES;i++){
 			if(device_data[i].device == x->device){
-				if(device_data[i].timestamp != x->timestamp){
-					if(device_data[i].rgb_data && device_data[i].depth_data){
-						x->timestamp = device_data[i].timestamp;
-						copy_depth_data(device_data[i].depth_data, depth_bp, &depth_minfo);
-						copy_rgb_data(device_data[i].rgb_data, rgb_bp, &rgb_minfo);
-					}
+				if(device_data[0].have_frames > 1){ //2 or more new frames: depth and rgb
+					pthread_mutex_lock(&mutex);
+					device_data[0].have_frames = 0; //Reset the frame counter
+					pthread_mutex_unlock(&mutex);
+					
+					x->timestamp = MAX(device_data[0].rgb_timestamp,device_data[0].depth_timestamp);
+					x->has_frames = 1; //We have new frames to output in "unique" mode
+					
+					//TODO: it might be worth sending these to their own threads for performance - jmp
+					copy_depth_data(device_data[0].depth_data, depth_bp, &depth_minfo, x->mode);
+					copy_rgb_data(device_data[0].rgb_data, rgb_bp, &rgb_minfo);
 				}
-			}
-		}
-		 */
-		
-				
-		x->has_frames = 0;
-						
-		if(device_data[0].device){
-			if(device_data[0].have_frames > 1){
-				pthread_mutex_lock(&mutex);
-				device_data[0].have_frames = 0;
-				pthread_mutex_unlock(&mutex);
-				
-				x->timestamp = MAX(device_data[0].rgb_timestamp,device_data[0].depth_timestamp);
-				x->has_frames = 1;
-				
-				//TODO: it might be worth sending this to their own threads for performance - jmp
-				copy_depth_data(device_data[0].depth_data, depth_bp, &depth_minfo);
-				copy_rgb_data(device_data[0].rgb_data, rgb_bp, &rgb_minfo);
 			}
 		}
 		
@@ -390,7 +411,7 @@ out:
 	return err;
 }
 
-void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info)
+void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, int mode)
 {
 	int i,j;
 	float4 vec_a, vec_b;
@@ -408,24 +429,87 @@ void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *de
 	}
 	
 	in = source;
-		
-	for(i=0;i<DEPTH_HEIGHT;i++){
-		out = (float *)(out_bp + dest_info->dimstride[1] * i);
-		for(j=0;j<DEPTH_WIDTH;j+=4){
-			
-			vec_a[0] = (float)in[0];
-			vec_a[1] = (float)in[1];
-			vec_a[2] = (float)in[2];
-			vec_a[3] = (float)in[3];
-			
-			//The macros below are to ensure that the multiplication is vectorized (SSE)
-			mult_scalar_float4(vec_a, (1.f / (float)0x7FF), vec_b); //Kinect depth is 11 bits in a 16-bit short, normalize to 0-1
-			copy_float4(vec_b, out);
-			
-			out += 4;
-			in += 4;
+	
+	if(mode == 1){ //Normalize 0-1
+		for(i=0;i<DEPTH_HEIGHT;i++){
+			out = (float *)(out_bp + dest_info->dimstride[1] * i);
+			for(j=0;j<DEPTH_WIDTH;j+=4){
+				
+				vec_a[0] = (float)in[0];
+				vec_a[1] = (float)in[1];
+				vec_a[2] = (float)in[2];
+				vec_a[3] = (float)in[3];
+				
+				//The macros below are to ensure that the multiplication is vectorized (SSE)
+				mult_scalar_float4(vec_a, (1.f / (float)0x7FF), vec_b); //Kinect depth is 11 bits in a 16-bit short, normalize to 0-1
+				copy_float4(vec_b, out);
+				
+				out += 4;
+				in += 4;
+			}
 		}
 	}
+	else if(mode == 2){ //Normalize 1-0
+		float4 vec_c;
+		vec_c[0] = vec_c[1] = vec_c[2] = vec_c[3] = 1.f;
+		for(i=0;i<DEPTH_HEIGHT;i++){
+			out = (float *)(out_bp + dest_info->dimstride[1] * i);
+			for(j=0;j<DEPTH_WIDTH;j+=4){
+				
+				vec_a[0] = (float)in[0];
+				vec_a[1] = (float)in[1];
+				vec_a[2] = (float)in[2];
+				vec_a[3] = (float)in[3];
+				
+				//The macros below are to ensure that the multiplication is vectorized (SSE)
+				mult_scalar_float4(vec_a, (1.f / (float)0x7FF), vec_b); //Kinect depth is 11 bits in a 16-bit short, normalize to 0-1
+				sub_float4(vec_c, vec_b, vec_a);
+				copy_float4(vec_a, out);
+				
+				out += 4;
+				in += 4;
+			}
+		}
+	}
+	else if(mode == 3){ //Distance
+		for(i=0;i<DEPTH_HEIGHT;i++){
+			out = (float *)(out_bp + dest_info->dimstride[1] * i);
+			for(j=0;j<DEPTH_WIDTH;j+=4){
+				
+				vec_a[0] = (float)in[0];
+				vec_a[1] = (float)in[1];
+				vec_a[2] = (float)in[2];
+				vec_a[3] = (float)in[3];
+				
+				//from https://github.com/OpenKinect/openkinect/wiki/Imaging-Information
+				// distance = 100 / (3.33 + depth * -0.00307)
+				mult_scalar_float4(vec_a, -0.00307f, vec_b);
+				add_scalar_float4(vec_b, 3.33f, vec_a);
+				div_scalar_float4_inv(vec_a, 100.f, vec_b);
+				
+				copy_float4(vec_b, out);
+				
+				out += 4;
+				in += 4;
+			}
+		}
+	}
+	else{ //Raw
+		for(i=0;i<DEPTH_HEIGHT;i++){
+			out = (float *)(out_bp + dest_info->dimstride[1] * i);
+			for(j=0;j<DEPTH_WIDTH;j+=4){
+				
+				out[0] = (float)in[0];
+				out[1] = (float)in[1];
+				out[2] = (float)in[2];
+				out[3] = (float)in[3];
+				
+				out += 4;
+				in += 4;
+			}
+		}
+	}
+	
 }
 
 void copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest_info)
