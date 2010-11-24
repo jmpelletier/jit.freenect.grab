@@ -1,5 +1,5 @@
 /*
- Copyright 2010, Jean-Marc Pelletier, Nenad Popov and cap10subtext 
+ Copyright 2010, Jean-Marc Pelletier, Nenad Popov and Andrew Roth 
  jmp@jmpelletier.com
  
  This file is part of jit.freenect.grab.

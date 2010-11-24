@@ -1,5 +1,5 @@
 /*
- Copyright 2010, Jean-Marc Pelletier, Nenad Popov and cap10subtext 
+ Copyright 2010, Jean-Marc Pelletier, Nenad Popov and Andrew Roth 
  jmp@jmpelletier.com
  
  This file is part of jit.freenect.grab.
@@ -88,7 +88,7 @@ t_jit_err 				jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs
 void					jit_freenect_open(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
 void					jit_freenect_close(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
 void					rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp);
-void					depth_callback(freenect_device *dev, freenect_depth *pixels, uint32_t timestamp);
+void					depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
 void					copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, int mode);
 void					copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest_info);
 
@@ -106,9 +106,14 @@ int object_count = 0;
 void *capture_threadfunc(void *arg)
 {
 	int done = 0;
+	int i;
 	int device_count = 0;
 	freenect_context *f_ctx = NULL;
-	freenect_device *f_dev = NULL;
+	freenect_device *f_dev[MAX_DEVICES];
+	
+	for(i=0;i<MAX_DEVICES;i++){
+		f_dev[i] = NULL;
+	}
 	
 	if (freenect_init(&f_ctx, NULL) < 0) {
 		printf("freenect_init() failed\n");
@@ -131,37 +136,69 @@ void *capture_threadfunc(void *arg)
 		else if(message.type == OPEN){
 			t_jit_freenect_grab *x;
 			
-			printf("Opening device.\n");
-			post("Opening device.");
-			if (freenect_open_device(f_ctx, &f_dev, 0) < 0) {  //<-- index does not appear to be implemented yet in libfreenect - jmp
-				printf("Could not open device\n");
-				goto out;
+			if(device_count < MAX_DEVICES){
+				if (freenect_open_device(f_ctx, &(f_dev[device_count]), 0) < 0) {  //<-- index does not appear to be implemented yet in libfreenect - jmp
+					printf("Could not open device\n");
+					goto out;
+				}
+				
+				freenect_set_depth_callback(f_dev[device_count], depth_callback);
+				freenect_set_rgb_callback(f_dev[device_count], rgb_callback);
+				freenect_set_rgb_format(f_dev[device_count], FREENECT_FORMAT_RGB);
+				
+				freenect_start_depth(f_dev[device_count]);
+				freenect_start_rgb(f_dev[device_count]);
+				
+				device_data[device_count].device = f_dev[device_count]; //<-- index does not appear to be implemented yet in libfreenect - jmp
+				device_data[device_count].index = 0; //<-- index does not appear to be implemented yet in libfreenect - jmp
+				
+				device_count++;
+				
+				x = message.data;
+				x->device = f_dev[device_count];
 			}
 			
-			freenect_set_depth_callback(f_dev, depth_callback);
-			freenect_set_rgb_callback(f_dev, rgb_callback);
-			freenect_set_rgb_format(f_dev, FREENECT_FORMAT_RGB);
-			
-			freenect_start_depth(f_dev);
-			freenect_start_rgb(f_dev);
-			
-			device_data[0].device = f_dev; //<-- index does not appear to be implemented yet in libfreenect - jmp
-			device_data[0].index = 0; //<-- index does not appear to be implemented yet in libfreenect - jmp
-			
-			device_count++;
-			
-			x = message.data;
-			x->device = f_dev;
-			
 			message.type = NONE;	
+		}
+		else if(message.type == CLOSE){
+			t_jit_freenect_grab *x = message.data;
+			
+			for(i=0;i<MAX_DEVICES;i++){
+				if(f_dev[i] == x->device){
+					/* Not good...
+					int j;
+					freenect_stop_depth(f_dev[i]);
+					freenect_stop_rgb(f_dev[i]);
+					
+					
+					libusb_release_interface(&(f_dev[i]->usb_cam.dev), 0);
+					free(f_dev[i]);
+					
+					device_count--;
+					
+					for(j=i;j<MAX_DEVICES-1;j++){
+						f_dev[j] = f_dev[j+1];
+					}
+					f_dev[j] = NULL;
+					 */
+				}
+			}
 		}
 		
 		pthread_mutex_unlock(&mutex);
 	}
 	
 out:
-	//printf("Exiting grabber thread.\n");
+	post("Exiting grabber thread.\n");
 	
+	
+	for(i=0;i<MAX_DEVICES;i++){
+		if(f_dev[i]){
+			freenect_stop_depth(f_dev[i]);
+			freenect_stop_rgb(f_dev[i]);
+			//freenect_close_device(&(f_dev[i]));
+		}
+	}
 	//The following gives "dereferencing pointer to incomplete type" error -- investigate - jmp 2010/11/21
 	/*
 	if(f_dev){
@@ -300,10 +337,7 @@ void jit_freenect_grab_free(t_jit_freenect_grab *x)
 	
 	object_count--;
 	
-	post("Object count: %d", object_count);
-	
 	if(object_count == 0){
-		post("Last object deleted");
 		pthread_mutex_lock(&mutex);
 		message.type = TERMINATE;
 		pthread_mutex_unlock(&mutex);
@@ -312,7 +346,6 @@ void jit_freenect_grab_free(t_jit_freenect_grab *x)
 
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
-	post("Trying to open device.");
 	if(!argc){
 		x->index = 0;	
 	}
@@ -328,7 +361,10 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 
 void jit_freenect_close(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
-	//TODO, close/start is automatic on object destruction/creation for now,  jmp 2010/11/21
+	pthread_mutex_lock(&mutex);
+	message.type = CLOSE;
+	message.data = x;
+	pthread_mutex_unlock(&mutex);
 }
 
 t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs)
@@ -558,7 +594,7 @@ void rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timesta
 	}
 }
 
-void depth_callback(freenect_device *dev, freenect_depth *pixels, uint32_t timestamp){
+void depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
 	int i;
 	for(i=0;i<MAX_DEVICES;i++){
 		if(device_data[i].device == dev){
