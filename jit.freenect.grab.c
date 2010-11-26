@@ -48,6 +48,7 @@ typedef struct _jit_freenect_grab
 	char mode;
 	freenect_device *device;
 	uint32_t timestamp;
+	long tilt;
 } t_jit_freenect_grab;
 
 typedef struct _grab_data
@@ -79,6 +80,8 @@ void 					jit_freenect_grab_free(t_jit_freenect_grab *x);
 t_jit_err 				jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs);
 void					jit_freenect_open(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
 void					jit_freenect_close(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
+void					jit_freenect_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv);
+
 void					rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp);
 void					depth_callback(freenect_device *dev, freenect_depth *pixels, uint32_t timestamp);
 void					copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info);
@@ -100,6 +103,7 @@ void *capture_threadfunc(void *arg)
 	int done = 0;
 	freenect_context *f_ctx = NULL;
 	freenect_device *f_dev = NULL;
+	//freenect_device *f_dev = NULL;
 	
 	//printf("Entering grabber thread.\n");
 	//post("Thread in.");
@@ -125,6 +129,10 @@ void *capture_threadfunc(void *arg)
 	device_data[0].device = f_dev;
 	device_data[0].index = 0;
 	pthread_mutex_unlock(&mutex);
+	
+	//freenect_set_led(f_dev,LED_GREEN);	//freenect_set_tilt_degs(f_dev,0);
+	
+
 	
 	while(!done && freenect_process_events(f_ctx) >= 0){
 		pthread_mutex_lock(&mutex);
@@ -162,7 +170,7 @@ t_jit_err jit_freenect_grab_init(void)
 	t_jit_object *attr;
 	t_jit_object *mop,*output;
 	t_atom a[1];
-	
+
 	_jit_freenect_grab_class = jit_class_new("jit_freenect_grab",(method)jit_freenect_grab_new,(method)jit_freenect_grab_free, sizeof(t_jit_freenect_grab),0L);
   	
 	//add mop
@@ -191,6 +199,7 @@ t_jit_err jit_freenect_grab_init(void)
 	//add methods
 	jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_open, "open", A_GIMME, 0L);
 	jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_close, "close", A_GIMME, 0L);
+	//jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_tilt, "tilt", A_GIMME, 0L);
 	
 	jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_grab_matrix_calc, "matrix_calc", A_CANT, 0L);
 	
@@ -201,6 +210,11 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,mode));
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"tilt",_jit_sym_long,attrflags,(method)NULL,(method)jit_freenect_tilt,calcoffset(t_jit_freenect_grab,tilt));
+	jit_attr_addfilterset_clip(attr,-30,30,TRUE,TRUE);
+	
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	jit_class_register(_jit_freenect_grab_class);
@@ -219,7 +233,7 @@ t_jit_err jit_freenect_grab_init(void)
 		error("Failed to create capture thread.\n");
 		return JIT_ERR_GENERIC;
 	}
-	
+ 
 	return JIT_ERR_NONE;
 }
 
@@ -243,6 +257,9 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		
 		object_count++;
 		post("Object count: %d", object_count);
+		
+
+		
 	} else {
 		x = NULL;
 	}	
@@ -265,14 +282,58 @@ void jit_freenect_grab_free(t_jit_freenect_grab *x)
 	}
 }
 
+
+void jit_freenect_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv)
+{
+	
+	long tilt=0;
+	
+	if (argv)
+	{
+	
+		
+		tilt = jit_atom_getlong(argv);
+
+		x->tilt = tilt;
+			
+		int i;
+		for(i=0;i<MAX_DEVICES;i++){
+			if(device_data[i].device == x->device){
+				
+				if(x->device)
+				freenect_set_tilt_degs(x->device,x->tilt);
+				else post("tilt:invalid device");
+				break;
+			}
+		}
+		 
+		
+
+	}
+	
+}
+
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
-	//TODO, close/start is automatic on object destruction/creation for now,  jmp 2010/11/21
-	
+		//TODO, close/start is automatic on object destruction/creation for now,  jmp 2010/11/21
+		
+	//TODO: remove this hack on merge with jmp
+	x->device = device_data[0].device;
+
 }
 
 void jit_freenect_close(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
+
+
+	
+	/*
+	freenect_angle--;
+	if (freenect_angle < -30) {
+		freenect_angle = -30;
+	}
+	freenect_set_tilt_degs(x->device,freenect_angle);
+	*/
 	//TODO, close/start is automatic on object destruction/creation for now,  jmp 2010/11/21
 }
 
