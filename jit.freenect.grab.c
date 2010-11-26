@@ -217,12 +217,28 @@ void *capture_threadfunc(void *arg)
 			
 			pthread_mutex_lock(&list_mutex);
 			
-			ndx = dev_list_push(&device_list);
 			x = message.data;
 			dev_ndx = x->index;
 			
+			if(!dev_ndx){
+				int found = 0;
+				while(!found){
+					found = 1;
+					for(i=0;i<device_list.count;i++){
+						if(device_list.devices[i].index == dev_ndx)
+							found = 0;
+					}
+					
+					dev_ndx++;
+				}
+				
+				x->index = dev_ndx;
+			}
+			
+			ndx = dev_list_push(&device_list);
+			
 			post("Opening device %d", dev_ndx);
-			if (freenect_open_device(f_ctx, &(device_list.devices[ndx].device), dev_ndx) < 0) {
+			if (freenect_open_device(f_ctx, &(device_list.devices[ndx].device), dev_ndx-1) < 0) {
 				dev_list_remove_item(&device_list, ndx);
 				error("Could not open device %d", dev_ndx);
 				goto out;
@@ -434,6 +450,7 @@ t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, lon
 
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
+	int ndevices, i;
 	if(!f_ctx){
 		error("Invalid context!");
 		return;
@@ -444,8 +461,15 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 		return;
 	}
 	
-	if(!freenect_num_devices(f_ctx)){
+	ndevices = freenect_num_devices(f_ctx);
+	
+	if(!ndevices){
 		post("Could not find any connected Kinect device. Are you sure the power cord is plugged-in?");
+		return;
+	}
+	
+	if(ndevices <= device_list.count){
+		post("All devices are currently in use.");
 		return;
 	}
 	
@@ -454,6 +478,14 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 	}
 	else{
 		x->index = jit_atom_getlong(argv);
+		
+		for(i=0;i<device_list.count;i++){
+			if(device_list.devices[i].index == x->index){
+				post("Device %d is already in use.", x->index);
+				x->index = 0;
+				return;
+			}
+		}
 	}
 	pthread_mutex_lock(&mess_mutex);
 	message.type = OPEN;

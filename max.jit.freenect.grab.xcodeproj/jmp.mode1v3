@@ -216,7 +216,7 @@
 						<key>_historyCapacity</key>
 						<integer>0</integer>
 						<key>bookmark</key>
-						<string>B4587E7A129F77E70024DF01</string>
+						<string>B4587EBA129F80BD0024DF01</string>
 						<key>history</key>
 						<array>
 							<string>B4587D54129E312B0024DF01</string>
@@ -256,7 +256,7 @@
 						<key>_historyCapacity</key>
 						<integer>0</integer>
 						<key>bookmark</key>
-						<string>B4587E7B129F77E70024DF01</string>
+						<string>B4587EBB129F80BD0024DF01</string>
 						<key>history</key>
 						<array>
 							<string>B4578D60129E007C004A0DF2</string>
@@ -296,7 +296,7 @@
 						<key>_historyCapacity</key>
 						<integer>0</integer>
 						<key>bookmark</key>
-						<string>B4587E7C129F77E70024DF01</string>
+						<string>B4587EBC129F80BD0024DF01</string>
 						<key>history</key>
 						<array>
 							<string>B4578D62129E007C004A0DF2</string>
@@ -336,7 +336,7 @@
 						<key>_historyCapacity</key>
 						<integer>0</integer>
 						<key>bookmark</key>
-						<string>B4587E7D129F77E70024DF01</string>
+						<string>B4587EBD129F80BD0024DF01</string>
 						<key>history</key>
 						<array>
 							<string>B4578D64129E007C004A0DF2</string>
@@ -425,7 +425,6 @@
 							<key>PBXSmartGroupTreeModuleOutlineStateExpansionKey</key>
 							<array>
 								<string>089C166AFE841209C02AAC07</string>
-								<string>B4793D9B129902F000A44AF1</string>
 								<string>B4B4AF031293DC7C00B34CB3</string>
 								<string>08FB77ADFE841716C02AAC07</string>
 								<string>089C1671FE841209C02AAC07</string>
@@ -436,8 +435,8 @@
 							<key>PBXSmartGroupTreeModuleOutlineStateSelectionKey</key>
 							<array>
 								<array>
-									<integer>17</integer>
-									<integer>16</integer>
+									<integer>11</integer>
+									<integer>10</integer>
 									<integer>0</integer>
 								</array>
 							</array>
@@ -491,7 +490,7 @@
 										<key>_historyCapacity</key>
 										<integer>0</integer>
 										<key>bookmark</key>
-										<string>B4587E79129F77E70024DF01</string>
+										<string>B4587EB9129F80BD0024DF01</string>
 										<key>history</key>
 										<array>
 											<string>B4B4AF0C1293DE9D00B34CB3</string>
@@ -519,16 +518,16 @@
 											<string>B452429E129BBF7000FBC113</string>
 											<string>B45242B0129BC16F00FBC113</string>
 											<string>B4524358129BF92A00FBC113</string>
-											<string>B4578CD5129CB3E8004A0DF2</string>
-											<string>B4578D4A129DFEBC004A0DF2</string>
 											<string>B4587D48129E312B0024DF01</string>
-											<string>B4587D4B129E312B0024DF01</string>
-											<string>B4587D4C129E312B0024DF01</string>
-											<string>B4587D4D129E312B0024DF01</string>
 											<string>B4587D9F129F46870024DF01</string>
 											<string>B4587DE7129F52750024DF01</string>
 											<string>B4587DF2129F52DC0024DF01</string>
-											<string>B4587E6F129F77950024DF01</string>
+											<string>B4587E80129F7DEE0024DF01</string>
+											<string>B4587E81129F7DEE0024DF01</string>
+											<string>B4587E82129F7DEE0024DF01</string>
+											<string>B4587E83129F7DEE0024DF01</string>
+											<string>B4587E84129F7DEE0024DF01</string>
+											<string>B4587EAA129F7FBD0024DF01</string>
 										</array>
 									</dict>
 									<key>SplitCount</key>
@@ -728,7 +727,6 @@
 	<array>
 		<string>B4587D5C129E312B0024DF01</string>
 		<string>B4587D5D129E312B0024DF01</string>
-		<string>1CD10A99069EF8BA00B06720</string>
 		<string>B4B4AEFF1293DC7000B34CB3</string>
 		<string>B452418E129BABB600FBC113</string>
 		<string>B452436A129BF9BD00FBC113</string>
@@ -736,6 +734,7 @@
 		<string>B4587D52129E312B0024DF01</string>
 		<string>1C78EAAD065D492600B07095</string>
 		<string>/Users/jmp/Documents/Development/jit.freenect.grab/max.jit.freenect.grab.xcodeproj</string>
+		<string>1CD10A99069EF8BA00B06720</string>
 	</array>
 	<key>WindowString</key>
 	<string>48 59 1376 819 0 0 1440 878 </string>
@@ -911,10 +910,10 @@
 									<key>Frame</key>
 									<string>{{529, 0}, {630, 353}}</string>
 									<key>RubberWindowFrame</key>
-									<string>225 167 1159 711 0 0 1440 878 </string>
+									<string>160 167 1159 711 0 0 1440 878 </string>
 								</dict>
 								<key>RubberWindowFrame</key>
-								<string>225 167 1159 711 0 0 1440 878 </string>
+								<string>160 167 1159 711 0 0 1440 878 </string>
 							</dict>
 							<key>Module</key>
 							<string>PBXDebugSessionModule</string>
@@ -948,11 +947,11 @@
 			<key>ToolbarConfiguration</key>
 			<string>xcode.toolbar.config.debugV3</string>
 			<key>WindowString</key>
-			<string>225 167 1159 711 0 0 1440 878 </string>
+			<string>160 167 1159 711 0 0 1440 878 </string>
 			<key>WindowToolGUID</key>
 			<string>1CD10A99069EF8BA00B06720</string>
 			<key>WindowToolIsVisible</key>
-			<false/>
+			<true/>
 		</dict>
 		<dict>
 			<key>Identifier</key>
