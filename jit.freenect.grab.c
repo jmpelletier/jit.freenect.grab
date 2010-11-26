@@ -45,6 +45,12 @@ typedef char char16[16];
 #define div_scalar_float4_inv(a,b,c) {int vector_iterator; for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator] = b / a[vector_iterator];}
 #define sub_float4(a,b,c) {int vector_iterator; for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator] = a[vector_iterator] - b[vector_iterator];}
 
+typedef union _lookup_data{
+	long *l_ptr;
+	float *f_ptr;
+	double *d_ptr;
+}t_lookup;
+
 typedef struct _jit_freenect_grab
 {
 	t_object		ob;
@@ -55,6 +61,8 @@ typedef struct _jit_freenect_grab
 	long ndevices;
 	freenect_device *device;
 	uint32_t timestamp;
+	t_lookup lut;
+	t_symbol *lut_type;
 } t_jit_freenect_grab;
 
 typedef struct _grab_data
@@ -95,8 +103,9 @@ t_jit_err               jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, vo
 void                    jit_freenect_open(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
 void                    jit_freenect_close(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
 void                    rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp);
+t_jit_err               jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av);
 void                    depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
-void                    copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, int mode);
+void                    copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut);
 void                    copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest_info);
 t_jit_err               jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
 
@@ -175,6 +184,113 @@ static void dev_list_clear(t_dev_list *list){
 	}
 	
 	list->count = 0;
+}
+
+void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
+	long i;
+	
+	if(type == _jit_sym_float32){
+		float *f_lut;
+		f_lut = (float *)realloc(lut->f_ptr, sizeof(float) * 0x800);
+		if(!f_lut){
+			error("Out of memory!");
+			return;
+		}
+		lut->f_ptr = f_lut;
+		
+		switch(mode){
+			case 0:
+				for(i=0;i<0x800;i++){
+					lut->f_ptr[i] = (float)i;
+				}
+				break;
+			case 1:
+				for(i=0;i<0x800;i++){
+					lut->f_ptr[i] = (float)i * (1.f / (float)0x7FF);
+				}
+				break;
+			case 2:
+				for(i=0;i<0x800;i++){
+					lut->f_ptr[i] = 1.f - ((float)i * (1.f / (float)0x7FF));
+				}
+				break;
+			case 3:
+				for(i=0;i<0x800;i++){
+					lut->f_ptr[i] = 100.f / (3.33f + (float)i * -0.00307f);
+				} 
+				break;
+		}
+	}
+	else if(type == _jit_sym_long){
+		long *l_lut;
+		l_lut = (long *)realloc(lut->l_ptr, sizeof(long) * 0x800);
+		if(!l_lut){
+			error("Out of memory!");
+			return;
+		}
+		lut->l_ptr = l_lut;
+		
+		switch(mode){
+			case 0:
+			case 1:
+				for(i=0;i<0x800;i++){
+					lut->l_ptr[i] = i;
+				}
+				break;
+			case 2:
+				for(i=0;i<0x800;i++){
+					lut->l_ptr[i] = 0x7FF - i;
+				}
+				break;
+			case 3:
+				for(i=0;i<0x800;i++){
+					lut->l_ptr[i] = (long)(100.f / (3.33f + (float)i * -0.00307f));
+				} 
+				break;
+		}
+	}
+	else if(type == _jit_sym_float64){
+		double *d_lut;
+		d_lut = (double *)realloc(lut->d_ptr, sizeof(double) * 0x800);
+		if(!d_lut){
+			error("Out of memory!");
+			return;
+		}
+		lut->d_ptr = d_lut;
+		
+		switch(mode){
+			case 0:
+				for(i=0;i<0x800;i++){
+					lut->d_ptr[i] = (double)i;
+				}
+				break;
+			case 1:
+				for(i=0;i<0x800;i++){
+					lut->d_ptr[i] = (double)i * (1.0 / (double)0x7FF);
+				}
+				break;
+			case 2:
+				for(i=0;i<0x800;i++){
+					lut->d_ptr[i] = 1.0 - ((double)i * (1.0 / (double)0x7FF));
+				}
+				break;
+			case 3:
+				for(i=0;i<0x800;i++){
+					lut->d_ptr[i] = 100.0 / (3.33 + (double)i * -0.00307);
+				} 
+				break;
+		}
+	}
+	else if(type == NULL){
+		if(lut->f_ptr){
+			free(lut->f_ptr);
+			lut->f_ptr = NULL;
+		}
+	}
+	else{
+		error("Invalid type for lookup table calculation. char not supported.");
+		return;
+	}
 }
 
 void *capture_threadfunc(void *arg)
@@ -303,7 +419,7 @@ t_jit_err jit_freenect_grab_init(void)
 	//int i;
 	t_jit_object *attr;
 	t_jit_object *mop,*output;
-	t_atom a[2];
+	t_atom a[4];
 	
 	_jit_freenect_grab_class = jit_class_new("jit_freenect_grab",(method)jit_freenect_grab_new,(method)jit_freenect_grab_free, sizeof(t_jit_freenect_grab),0L);
   	
@@ -313,8 +429,12 @@ t_jit_err jit_freenect_grab_init(void)
 	//Prepare depth image, all values are hard-coded, may need to be queried for safety?
 	output = jit_object_method(mop,_jit_sym_getoutput,1);
 	
+	//jit_attr_setlong(output,_jit_sym_typelink,0);
+	
 	jit_atom_setsym(a,_jit_sym_float32); //default
-	jit_object_method(output,_jit_sym_types,1,a);
+	jit_atom_setsym(a+1,_jit_sym_long);
+	jit_atom_setsym(a+2,_jit_sym_float64);
+	jit_object_method(output,_jit_sym_types,3,a);
 	
 	jit_attr_setlong(output,_jit_sym_minplanecount,1);
 	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
@@ -324,10 +444,11 @@ t_jit_err jit_freenect_grab_init(void)
 	
 	jit_object_method(output, _jit_sym_mindim, 2, a);  //Two dimensions, sizes in atom array
 	jit_object_method(output, _jit_sym_maxdim, 2, a);
-		
+	
 	//Prepare RGB image
 	output = jit_object_method(mop,_jit_sym_getoutput,2);
 	
+	//jit_attr_setlong(output,_jit_sym_typelink,0);
 	jit_atom_setsym(a,_jit_sym_char); //default
 	jit_object_method(output,_jit_sym_types,1,a);
 	
@@ -352,9 +473,10 @@ t_jit_err jit_freenect_grab_init(void)
 	
 	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW;
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"unique",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,unique));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
-	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,mode));
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,attrflags,(method)NULL,(method)jit_freenect_set_mode,calcoffset(t_jit_freenect_grab,mode));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_OPAQUE;
@@ -393,6 +515,8 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->mode = 0;
 		x->has_frames = 0;
 		x->ndevices = 0;
+		x->lut.f_ptr = NULL;
+		x->lut_type = NULL;
 		
 		if(object_count == 0){
 			if (pthread_create(&capture_thread, NULL, capture_threadfunc, NULL)) {
@@ -414,6 +538,10 @@ void jit_freenect_grab_free(t_jit_freenect_grab *x)
 	jit_freenect_close(x, NULL, 0, NULL);
 	
 	object_count--;
+	
+	if(x->lut.f_ptr){
+		free(x->lut.f_ptr);
+	}
 	
 	if(object_count == 0){
 		pthread_mutex_lock(&mess_mutex);
@@ -446,6 +574,20 @@ t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, lon
 	jit_atom_setlong(*av,x->ndevices);
 	
 	return JIT_ERR_NONE;
+}
+
+t_jit_err jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av){
+    if(ac < 1){
+        return JIT_ERR_NONE;
+    }
+	
+	if(x->mode != jit_atom_getlong(av)){
+		x->mode = jit_atom_getlong(av);
+		CLIP(x->mode, 0, 3);
+		calculate_lut(&x->lut, x->lut_type, x->mode);
+	}
+	
+    return JIT_ERR_NONE;
 }
 
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
@@ -525,7 +667,7 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 		jit_object_method(depth_matrix,_jit_sym_getinfo,&depth_minfo);
 		jit_object_method(rgb_matrix,_jit_sym_getinfo,&rgb_minfo);
 		
-		if ((depth_minfo.type != _jit_sym_float32) || (rgb_minfo.type != _jit_sym_char)) //overkill, but you can never be too sure
+		if ((depth_minfo.type == _jit_sym_char) || (rgb_minfo.type != _jit_sym_char)) 
 		{
 			err=JIT_ERR_MISMATCH_TYPE;
 			goto out;
@@ -555,6 +697,11 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 		
 		jit_object_method(rgb_matrix,_jit_sym_getdata,&rgb_bp);
 		if (!rgb_bp) { err=JIT_ERR_INVALID_OUTPUT; goto out;}
+		
+		if((depth_minfo.type != x->lut_type) || !x->lut.f_ptr){
+			calculate_lut(&x->lut, depth_minfo.type, x->mode);
+			x->lut_type = depth_minfo.type;
+		}
 		 
 		//Grab and copy matrices
 		x->has_frames = 0;  //Assume there are no new frames
@@ -570,7 +717,7 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 					x->has_frames = 1; //We have new frames to output in "unique" mode
 					
 					//TODO: it might be worth sending these to their own threads for performance - jmp
-					copy_depth_data(device_list.devices[i].depth_data, depth_bp, &depth_minfo, x->mode);
+					copy_depth_data(device_list.devices[i].depth_data, depth_bp, &depth_minfo, &x->lut);
 					copy_rgb_data(device_list.devices[i].rgb_data, rgb_bp, &rgb_minfo);
 				}
 			}
@@ -586,12 +733,12 @@ out:
 	return err;
 }
 
-void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, int mode)
+void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut)
 {
 	int i,j;
-	float4 vec_a, vec_b;
+	//float4 vec_a, vec_b;
 	
-	float *out;
+	//float *out;
 	freenect_depth *in;
 	
 	if(!source){
@@ -605,6 +752,38 @@ void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *de
 	
 	in = source;
 	
+	if(dest_info->type == _jit_sym_float32){
+		float *out;
+		for(i=0;i<DEPTH_HEIGHT;i++){
+			out = (float *)(out_bp + dest_info->dimstride[1] * i);
+			for(j=0;j<DEPTH_WIDTH;j++){
+				out[j] = lut->f_ptr[*in];
+				in++;
+			}
+		}
+	}
+	else if(dest_info->type == _jit_sym_float64){
+		double *out;
+		for(i=0;i<DEPTH_HEIGHT;i++){
+			out = (double *)(out_bp + dest_info->dimstride[1] * i);
+			for(j=0;j<DEPTH_WIDTH;j++){
+				out[j] = lut->d_ptr[*in];
+				in++;
+			}
+		}
+	}
+	else if(dest_info->type == _jit_sym_long){
+		long *out;
+		for(i=0;i<DEPTH_HEIGHT;i++){
+			out = (long *)(out_bp + dest_info->dimstride[1] * i);
+			for(j=0;j<DEPTH_WIDTH;j++){
+				out[j] = lut->l_ptr[*in];
+				in++;
+			}
+		}
+	}
+	
+	/*
 	if(mode == 1){ //Normalize 0-1
 		for(i=0;i<DEPTH_HEIGHT;i++){
 			out = (float *)(out_bp + dest_info->dimstride[1] * i);
@@ -684,6 +863,7 @@ void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *de
 			}
 		}
 	}
+	 */
 	
 }
 

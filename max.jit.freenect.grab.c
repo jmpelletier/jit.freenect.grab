@@ -126,9 +126,24 @@ void *max_jit_freenect_grab_new(t_symbol *s, long argc, t_atom *argv)
 	if (x=(t_max_jit_freenect_grab *)max_jit_obex_new(max_jit_freenect_grab_class,gensym("jit_freenect_grab"))) {
 		x->av = NULL;
 		if (o=jit_object_new(gensym("jit_freenect_grab"))) {
-			max_jit_mop_setup_simple(x,o,argc,argv);			
+			max_jit_mop_setup_simple(x,o,argc,argv);
 			max_jit_attr_args(x,argc,argv);
 			x->av = jit_getbytes(1*sizeof(t_atom));
+			
+			if(argc){
+				if(argv[0].a_type == A_SYM){
+					t_symbol *s = jit_atom_getsym(argv);
+					if((s == _jit_sym_float32)||(s == _jit_sym_float64)||(s == _jit_sym_long)){
+						//void *mop = max_jit_obex_adornment_get(x,_jit_sym_jit_mop);
+						void *output = max_jit_mop_getoutput(x, 1);
+						//jit_object_method(mop,_jit_sym_type, s);
+						jit_attr_setsym(output, _jit_sym_type, s);
+					}
+					else{
+						error("Invalid type argument: %s", argv[0].a_w.w_sym->s_name);
+					}
+				}
+			}
 		} else {
 			error("jit.freenect.grab: could not allocate object");
 			freeobject((t_object *)x);
