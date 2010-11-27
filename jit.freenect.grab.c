@@ -23,27 +23,12 @@
 #include <libusb.h>
 #include "libfreenect.h"
 #include <time.h>
-//#include "usb_libusb10.h"
-
-typedef float float4[4];
-typedef char char16[16];
 
 #define DEPTH_WIDTH 640
 #define DEPTH_HEIGHT 480
 #define RGB_WIDTH 640
 #define RGB_HEIGHT 480
 #define MAX_DEVICES 8
-
-#define set_float4(a,b) {int vector_iterator;for(vector_iterator=0;vector_iterator<4;vector_iterator++)a[vector_iterator]= b;}
-#define set_char16(a,b) {int vector_iterator;for(vector_iterator=0;vector_iterator<16;vector_iterator++)a[vector_iterator]= b;}
-
-#define copy_float4(a,b) {int vector_iterator;for(vector_iterator=0;vector_iterator<4;vector_iterator++)b[vector_iterator] = a[vector_iterator];}
-#define copy_char16(a,b) {int vector_iterator;for(vector_iterator=0;vector_iterator<16;vector_iterator++)b[vector_iterator] = a[vector_iterator];}
-
-#define mult_scalar_float4(a,b,c) {int vector_iterator;for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator]= a[vector_iterator] * b;}
-#define add_scalar_float4(a,b,c) {int vector_iterator; for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator] = a[vector_iterator] + b;}
-#define div_scalar_float4_inv(a,b,c) {int vector_iterator; for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator] = b / a[vector_iterator];}
-#define sub_float4(a,b,c) {int vector_iterator; for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator] = a[vector_iterator] - b[vector_iterator];}
 
 typedef union _lookup_data{
 	long *l_ptr;
@@ -53,16 +38,20 @@ typedef union _lookup_data{
 
 typedef struct _jit_freenect_grab
 {
-	t_object		ob;
-	char unique;
-	char mode;
-	char has_frames;
-	long index;
-	long ndevices;
-	freenect_device *device;
-	uint32_t timestamp;
-	t_lookup lut;
-	t_symbol *lut_type;
+	t_object         ob;
+	char             unique;
+	char             mode;
+	char             has_frames;
+	long             index;
+	long             ndevices;
+	freenect_device  *device;
+	uint32_t         timestamp;
+	t_lookup         lut;
+	t_symbol         *lut_type;
+	long             tilt;
+	long             accelcount;
+	long             raw_accel[3];
+	double           mks_accel[3];
 } t_jit_freenect_grab;
 
 typedef struct _grab_data
@@ -99,29 +88,40 @@ void *_jit_freenect_grab_class;
 t_jit_err               jit_freenect_grab_init(void);
 t_jit_freenect_grab     *jit_freenect_grab_new(void);
 void                    jit_freenect_grab_free(t_jit_freenect_grab *x);
-t_jit_err               jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs);
+
 void                    jit_freenect_open(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
 void                    jit_freenect_close(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
-void                    rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp);
+
+t_jit_err               jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
+t_jit_err               jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
+t_jit_err               jit_freenect_grab_get_mksaccel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
+void					jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv);
+//void					jit_freenect_accel(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv);
+
 t_jit_err               jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av);
-void                    depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
+
+t_jit_err               jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs);
 void                    copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut);
 void                    copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest_info);
-t_jit_err               jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
+
+void                    rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp);
+void                    depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
+
+
 
 
 //t_grab_data device_data[MAX_DEVICES];  // <-- TODO: Fix multi-camera functionality - jmp 2010/11/21
-int device_count = 0;
+//int device_count = 0;
 
+pthread_t       capture_thread;
 pthread_mutex_t mess_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t list_mutex = PTHREAD_MUTEX_INITIALIZER;
-t_thread_mess message;
-pthread_t capture_thread;
+t_thread_mess   message;
+
 int object_count = 0;
 
 freenect_context *f_ctx = NULL;
-
-t_dev_list device_list;
+t_dev_list       device_list;
 
 static int dev_list_push(t_dev_list *list){
 	t_grab_data *tmp;
@@ -372,8 +372,10 @@ void *capture_threadfunc(void *arg)
 			
 			x->device = device_list.devices[ndx].device;
 			
-			freenect_start_depth(device_list.devices[ndx].device);
-			freenect_start_rgb(device_list.devices[ndx].device);
+			freenect_set_tilt_degs(x->device,x->tilt);
+			
+			freenect_start_depth(x->device);
+			freenect_start_rgb(x->device);
 			
 			message.type = NONE;	
 		}
@@ -428,9 +430,7 @@ t_jit_err jit_freenect_grab_init(void)
 	
 	//Prepare depth image, all values are hard-coded, may need to be queried for safety?
 	output = jit_object_method(mop,_jit_sym_getoutput,1);
-	
-	//jit_attr_setlong(output,_jit_sym_typelink,0);
-	
+		
 	jit_atom_setsym(a,_jit_sym_float32); //default
 	jit_atom_setsym(a+1,_jit_sym_long);
 	jit_atom_setsym(a+2,_jit_sym_float64);
@@ -448,7 +448,6 @@ t_jit_err jit_freenect_grab_init(void)
 	//Prepare RGB image
 	output = jit_object_method(mop,_jit_sym_getoutput,2);
 	
-	//jit_attr_setlong(output,_jit_sym_typelink,0);
 	jit_atom_setsym(a,_jit_sym_char); //default
 	jit_object_method(output,_jit_sym_types,1,a);
 	
@@ -472,22 +471,41 @@ t_jit_err jit_freenect_grab_init(void)
 	//add attributes	
 	
 	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW;
-	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"unique",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,unique));
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"unique",_jit_sym_char,
+										  attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,unique));
 	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
-	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,attrflags,(method)NULL,(method)jit_freenect_set_mode,calcoffset(t_jit_freenect_grab,mode));
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,
+										  attrflags,(method)NULL,(method)jit_freenect_set_mode,calcoffset(t_jit_freenect_grab,mode));
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"tilt",_jit_sym_long,
+										  attrflags,(method)NULL,(method)jit_freenect_set_tilt,calcoffset(t_jit_freenect_grab,tilt));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_OPAQUE;
-	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"index",_jit_sym_long,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,index));
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"index",_jit_sym_long,
+										  attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,index));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
-	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"ndevices",_jit_sym_long,attrflags,(method)jit_freenect_grab_get_ndevices,(method)NULL,calcoffset(t_jit_freenect_grab,ndevices));
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"ndevices",_jit_sym_long,
+										  attrflags,(method)jit_freenect_grab_get_ndevices,(method)NULL,calcoffset(t_jit_freenect_grab,ndevices));
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset_array, "accel", _jit_sym_long, 3, 
+										  attrflags, (method)jit_freenect_grab_get_accel,(method)NULL, 
+										  calcoffset(t_jit_freenect_grab, accelcount),calcoffset(t_jit_freenect_grab,raw_accel));
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset_array, "mksaccel", _jit_sym_float64, 3, 
+										  attrflags, (method)jit_freenect_grab_get_mksaccel,(method)NULL, 
+										  calcoffset(t_jit_freenect_grab, accelcount),calcoffset(t_jit_freenect_grab,mks_accel));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attrflags = JIT_ATTR_GET_OPAQUE_USER | JIT_ATTR_SET_OPAQUE_USER;
-	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"has_frames",_jit_sym_char,attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,has_frames));
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"has_frames",_jit_sym_char,
+										  attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,has_frames));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	jit_class_register(_jit_freenect_grab_class);
@@ -517,6 +535,7 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->ndevices = 0;
 		x->lut.f_ptr = NULL;
 		x->lut_type = NULL;
+		x->tilt = 0;
 		
 		if(object_count == 0){
 			if (pthread_create(&capture_thread, NULL, capture_threadfunc, NULL)) {
@@ -576,6 +595,56 @@ t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, lon
 	return JIT_ERR_NONE;
 }
 
+t_jit_err jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
+	int16_t ax=0,ay=0,az=0;
+	
+	if ((*ac)&&(*av)) {
+		//memory passed in, use it
+	} else {
+		//otherwise allocate memory
+		*ac = 3;
+		if (!(*av = jit_getbytes(sizeof(t_atom)*(*ac)))) {
+			*ac = 0;
+			return JIT_ERR_OUT_OF_MEM;
+		}
+	}
+	
+	if(x->device){
+		freenect_get_raw_accel(x->device, &ax, &ay, &az);
+	}
+	
+	jit_atom_setlong(*av, ax);
+	jit_atom_setlong(*av +1, ay);
+	jit_atom_setlong(*av +2, az);
+	
+	return JIT_ERR_NONE;
+}
+
+t_jit_err jit_freenect_grab_get_mksaccel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
+	double ax=0,ay=0,az=0;
+	
+	if ((*ac)&&(*av)) {
+		//memory passed in, use it
+	} else {
+		//otherwise allocate memory
+		*ac = 3;
+		if (!(*av = jit_getbytes(sizeof(t_atom)*(*ac)))) {
+			*ac = 0;
+			return JIT_ERR_OUT_OF_MEM;
+		}
+	}
+
+	if(x->device){
+		freenect_get_mks_accel(x->device, &ax, &ay, &az);
+	}
+	
+	jit_atom_setfloat(*av, ax);
+	jit_atom_setfloat(*av +1, ay);
+	jit_atom_setfloat(*av +2, az);
+		
+	return JIT_ERR_NONE;
+}
+
 t_jit_err jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av){
     if(ac < 1){
         return JIT_ERR_NONE;
@@ -588,6 +657,19 @@ t_jit_err jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_a
 	}
 	
     return JIT_ERR_NONE;
+}
+
+void jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv)
+{
+	if(argv){
+		x->tilt = jit_atom_getlong(argv);
+		
+		CLIP(x->tilt, -30, 30);
+		
+		if(x->device){
+			freenect_set_tilt_degs(x->device,x->tilt);
+		}
+	}
 }
 
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
