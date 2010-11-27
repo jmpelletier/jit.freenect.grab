@@ -36,6 +36,13 @@ typedef union _lookup_data{
 	double *d_ptr;
 }t_lookup;
 
+enum thread_mess_type{
+	NONE,
+	OPEN,
+	CLOSE,
+	TERMINATE
+};
+
 typedef struct _jit_freenect_grab
 {
 	t_object         ob;
@@ -50,38 +57,19 @@ typedef struct _jit_freenect_grab
 	t_symbol         *lut_type;
 	long             tilt;
 	long             accelcount;
-	long             raw_accel[3];
 	double           mks_accel[3];
+	freenect_pixel   *rgb_data;
+	freenect_depth   *depth_data;
+	uint32_t         rgb_timestamp;
+	uint32_t         depth_timestamp;
+	char             have_frames;
 } t_jit_freenect_grab;
 
-typedef struct _grab_data
+typedef struct _obj_list
 {
-	freenect_pixel *rgb_data;
-	freenect_depth *depth_data;
-	freenect_device *device;
-	uint32_t index;
-	uint32_t rgb_timestamp;
-	uint32_t depth_timestamp;
-	char have_frames;
-} t_grab_data;
-
-typedef struct _devlist
-{
-	t_grab_data *devices;
+	t_jit_freenect_grab **objects;
 	uint32_t count;
-} t_dev_list;
-
-enum thread_mess_type{
-	NONE,
-	OPEN,
-	CLOSE,
-	TERMINATE
-};
-
-typedef struct _thread_mess{
-	enum thread_mess_type type;
-	void *data;
-} t_thread_mess;
+} t_obj_list;
 
 void *_jit_freenect_grab_class;
 
@@ -94,9 +82,7 @@ void                    jit_freenect_close(t_jit_freenect_grab *x, t_symbol *s, 
 
 t_jit_err               jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
 t_jit_err               jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
-t_jit_err               jit_freenect_grab_get_mksaccel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
 void					jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv);
-//void					jit_freenect_accel(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv);
 
 t_jit_err               jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av);
 
@@ -107,83 +93,61 @@ void                    copy_rgb_data(freenect_pixel *source, char *out_bp, t_ji
 void                    rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp);
 void                    depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
 
-
-
-
-//t_grab_data device_data[MAX_DEVICES];  // <-- TODO: Fix multi-camera functionality - jmp 2010/11/21
-//int device_count = 0;
-
 pthread_t       capture_thread;
-pthread_mutex_t mess_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t list_mutex = PTHREAD_MUTEX_INITIALIZER;
-t_thread_mess   message;
+int terminate_thread;
 
 int object_count = 0;
 
 freenect_context *f_ctx = NULL;
-t_dev_list       device_list;
+t_obj_list       object_list;
 
-static int dev_list_push(t_dev_list *list){
-	t_grab_data *tmp;
+static int obj_list_push(t_obj_list *list, t_jit_freenect_grab *x){
+	t_jit_freenect_grab **tmp;
 	
 	if(!list){
-		error("list_push: invalid pointer.");
+		error("obj_list_push: invalid pointer.");
 		return -1;
 	}
 	
-	tmp = (t_grab_data *)realloc(list->devices, (list->count+1)*sizeof(t_grab_data));
+	tmp = (t_jit_freenect_grab **)realloc(list->objects, (list->count+1)*sizeof(t_jit_freenect_grab *));
 	
 	if(tmp){
-		list->devices = tmp;
-		list->devices[list->count].depth_data = NULL;
-		list->devices[list->count].depth_timestamp = 0;
-		list->devices[list->count].rgb_data = NULL;
-		list->devices[list->count].rgb_timestamp = 0;
-		list->devices[list->count].have_frames = 0;
-		list->devices[list->count].device = NULL;
-		list->devices[list->count].index = 0;
+		list->objects = tmp;
+		list->objects[list->count] = x;
 		list->count++;
 	}
 	else{
 		error("list_push: Out of memory.");
 		return -1;
 	}
-		
+	
 	return list->count - 1;
 }
 
-static int dev_list_remove_item(t_dev_list *list, uint32_t index){
+static int obj_list_remove_item(t_obj_list *list, t_jit_freenect_grab *x){
 	int i;
 	
 	if(!list){
-		error("list_remove_item: invalid pointer.");
+		error("obj_list_remove_item: invalid pointer.");
 		return -1;
 	}
 	
-	if(index >= list->count){
-		error("list_remove_item: index out of range.");
-		return -1;
+	for(i=0;i<list->count;i++){
+		if(list->objects[i] == x){
+			for(i++;i<list->count;i++){
+				list->objects[i-1] = list->objects[i];
+			}
+		}
+		list->count--;
+		list->objects[list->count] = NULL;
 	}
 	
-	for(i=index;i<list->count - 1;i++){
-		list->devices[i] = list->devices[i+1];
-	}
-		
-	return list->count--;
-}
-
-static void dev_list_clear(t_dev_list *list){
-	if(!list){
-		error("list_clear: invalid pointer.");
-		return;
+	if(!list->count){
+		free(list->objects);
+		list->objects = NULL;
 	}
 	
-	if(list->devices){
-		free(list->devices);
-		list->devices = NULL;
-	}
-	
-	list->count = 0;
+	return list->count;
 }
 
 void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
@@ -295,122 +259,36 @@ void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
 
 void *capture_threadfunc(void *arg)
 {
-	int done = 0;
 	int i;
-
-	if(pthread_mutex_init(&mess_mutex, NULL)){
-		error("Could not initialize mutex.");
-		goto out;
+	int process_events = 0;
+	
+	if(!f_ctx){
+		if (freenect_init(&f_ctx, NULL) < 0) {
+			printf("freenect_init() failed\n");
+			goto out;
+		}
 	}
 	
-	if(pthread_mutex_init(&list_mutex, NULL)){
-		error("Could not initialize mutex.");
-		goto out;
-	}
-	
-	if (freenect_init(&f_ctx, NULL) < 0) {
-		printf("freenect_init() failed\n");
-		goto out;
-	}
+	terminate_thread = 0;
 		
-	while(!done){
-		if(device_list.count > 0){
+	while(!terminate_thread){
+		process_events = 0;
+		for(i=0;i<object_list.count;i++){
+			if(object_list.objects[i]->device)
+				process_events = 1;
+			
+			sleep(0);
+		}
+		
+		if(process_events){
 			if(freenect_process_events(f_ctx) < 0){
 				error("Could not process events.");
 				break;
 			}
 		}
-		
-		pthread_mutex_lock(&mess_mutex);
-		
-		if(message.type == TERMINATE){
-			done = 1;
-			message.type = NONE;
-		}
-		else if(message.type == OPEN){
-			int ndx, dev_ndx;
-			t_jit_freenect_grab *x;
-			
-			pthread_mutex_lock(&list_mutex);
-			
-			x = message.data;
-			dev_ndx = x->index;
-			
-			if(!dev_ndx){
-				int found = 0;
-				while(!found){
-					found = 1;
-					for(i=0;i<device_list.count;i++){
-						if(device_list.devices[i].index == dev_ndx)
-							found = 0;
-					}
-					
-					dev_ndx++;
-				}
-				
-				x->index = dev_ndx;
-			}
-			
-			ndx = dev_list_push(&device_list);
-			
-			post("Opening device %d", dev_ndx);
-			if (freenect_open_device(f_ctx, &(device_list.devices[ndx].device), dev_ndx-1) < 0) {
-				dev_list_remove_item(&device_list, ndx);
-				error("Could not open device %d", dev_ndx);
-				goto out;
-			}
-			
-			freenect_set_depth_callback(device_list.devices[ndx].device, depth_callback);
-			freenect_set_rgb_callback(device_list.devices[ndx].device, rgb_callback);
-			freenect_set_rgb_format(device_list.devices[ndx].device, FREENECT_FORMAT_RGB);
-			
-			freenect_set_led(device_list.devices[ndx].device,LED_RED);
-			
-			device_list.devices[ndx].index = dev_ndx;
-			
-			pthread_mutex_unlock(&list_mutex);
-			
-			x->device = device_list.devices[ndx].device;
-			
-			freenect_set_tilt_degs(x->device,x->tilt);
-			
-			freenect_start_depth(x->device);
-			freenect_start_rgb(x->device);
-			
-			message.type = NONE;	
-		}
-		else if(message.type == CLOSE){
-			t_jit_freenect_grab *x = message.data;
-			
-			for(i=0;i<device_list.count;i++){
-				if(device_list.devices[i].device == x->device){
-					freenect_set_led(device_list.devices[i].device,LED_BLINK_GREEN);
-					freenect_close_device(device_list.devices[i].device);
-					dev_list_remove_item(&device_list, i);
-					break;
-				}
-			}
-			
-			x->device = NULL;
-			message.type = NONE;
-		}
-		
-		pthread_mutex_unlock(&mess_mutex);
 	}
 	
-out:
-	post("Exiting grabber thread.\n");
-	
-	for(i=0;i<device_list.count;i++){
-		freenect_set_led(device_list.devices[i].device,LED_BLINK_GREEN);
-		freenect_close_device(device_list.devices[i].device);
-	}
-	
-	dev_list_clear(&device_list);
-	
-	pthread_mutex_destroy(&mess_mutex);
-	pthread_mutex_destroy(&list_mutex);
-		
+out:	
 	pthread_exit(NULL);
 	return NULL;
 }
@@ -418,7 +296,6 @@ out:
 t_jit_err jit_freenect_grab_init(void)
 {
 	long attrflags=0;
-	//int i;
 	t_jit_object *attr;
 	t_jit_object *mop,*output;
 	t_atom a[4];
@@ -469,7 +346,6 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_grab_matrix_calc, "matrix_calc", A_CANT, 0L);
 	
 	//add attributes	
-	
 	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW;
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"unique",_jit_sym_char,
 										  attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,unique));
@@ -493,13 +369,8 @@ t_jit_err jit_freenect_grab_init(void)
 										  attrflags,(method)jit_freenect_grab_get_ndevices,(method)NULL,calcoffset(t_jit_freenect_grab,ndevices));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
-	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset_array, "accel", _jit_sym_long, 3, 
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset_array, "accel", _jit_sym_float64, 3, 
 										  attrflags, (method)jit_freenect_grab_get_accel,(method)NULL, 
-										  calcoffset(t_jit_freenect_grab, accelcount),calcoffset(t_jit_freenect_grab,raw_accel));
-	jit_class_addattr(_jit_freenect_grab_class,attr);
-	
-	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset_array, "mksaccel", _jit_sym_float64, 3, 
-										  attrflags, (method)jit_freenect_grab_get_mksaccel,(method)NULL, 
 										  calcoffset(t_jit_freenect_grab, accelcount),calcoffset(t_jit_freenect_grab,mks_accel));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
@@ -509,14 +380,9 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	jit_class_register(_jit_freenect_grab_class);
-	
-	object_count = 0;
-	
-	message.type = NONE;
-	message.data = NULL;
-	
-	device_list.devices = NULL;
-	device_list.count = 0;
+		
+	object_list.objects = NULL;
+	object_list.count = 0;
 	
 	return JIT_ERR_NONE;
 }
@@ -537,15 +403,15 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->lut_type = NULL;
 		x->tilt = 0;
 		
-		if(object_count == 0){
+		if(object_list.count == 0){
 			if (pthread_create(&capture_thread, NULL, capture_threadfunc, NULL)) {
 				error("Failed to create capture thread.");
 				return NULL;
 			}
 		}
 		
-		object_count++;
-		post("Object count: %d", object_count);
+		obj_list_push(&object_list, x);
+		
 	} else {
 		x = NULL;
 	}	
@@ -555,26 +421,23 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 void jit_freenect_grab_free(t_jit_freenect_grab *x)
 {
 	jit_freenect_close(x, NULL, 0, NULL);
-	
-	object_count--;
+		
+	obj_list_remove_item(&object_list, x);
 	
 	if(x->lut.f_ptr){
 		free(x->lut.f_ptr);
 	}
 	
-	if(object_count == 0){
-		pthread_mutex_lock(&mess_mutex);
-		message.type = TERMINATE;
-		pthread_mutex_unlock(&mess_mutex);
+	if(object_list.count == 0){
+		terminate_thread = 1;
 	}
 }
 
 t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
 	
 	if ((*ac)&&(*av)) {
-		//memory passed in, use it
+		
 	} else {
-		//otherwise allocate memory
 		*ac = 1;
 		if (!(*av = jit_getbytes(sizeof(t_atom)*(*ac)))) {
 			*ac = 0;
@@ -596,37 +459,11 @@ t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, lon
 }
 
 t_jit_err jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
-	int16_t ax=0,ay=0,az=0;
-	
-	if ((*ac)&&(*av)) {
-		//memory passed in, use it
-	} else {
-		//otherwise allocate memory
-		*ac = 3;
-		if (!(*av = jit_getbytes(sizeof(t_atom)*(*ac)))) {
-			*ac = 0;
-			return JIT_ERR_OUT_OF_MEM;
-		}
-	}
-	
-	if(x->device){
-		freenect_get_raw_accel(x->device, &ax, &ay, &az);
-	}
-	
-	jit_atom_setlong(*av, ax);
-	jit_atom_setlong(*av +1, ay);
-	jit_atom_setlong(*av +2, az);
-	
-	return JIT_ERR_NONE;
-}
-
-t_jit_err jit_freenect_grab_get_mksaccel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
 	double ax=0,ay=0,az=0;
 	
 	if ((*ac)&&(*av)) {
-		//memory passed in, use it
+		
 	} else {
-		//otherwise allocate memory
 		*ac = 3;
 		if (!(*av = jit_getbytes(sizeof(t_atom)*(*ac)))) {
 			*ac = 0;
@@ -674,7 +511,7 @@ void jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_ato
 
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
-	int ndevices, i;
+	int ndevices, i, devices_left, dev_ndx;
 	if(!f_ctx){
 		error("Invalid context!");
 		return;
@@ -692,8 +529,14 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 		return;
 	}
 	
-	if(ndevices <= device_list.count){
-		post("All devices are currently in use.");
+	devices_left = ndevices;
+	
+	for(i=0;i<object_list.count;i++){
+		if(object_list.objects[i]->device)
+			devices_left--;
+	}
+	if(!devices_left){
+		post("All Kinect devices are currently in use.");
 		return;
 	}
 	
@@ -701,28 +544,75 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 		x->index = 0;	
 	}
 	else{
+		//Is the device already in use?
 		x->index = jit_atom_getlong(argv);
 		
-		for(i=0;i<device_list.count;i++){
-			if(device_list.devices[i].index == x->index){
-				post("Device %d is already in use.", x->index);
-				x->index = 0;
-				return;
+		for(i=0;i<object_list.count;i++){
+			if(object_list.objects[i]->device){
+				if(object_list.objects[i]->index == x->index){
+					post("Kinect device %d is already in use.", x->index);
+					x->index = 0;
+					return;
+				}
 			}
 		}
 	}
-	pthread_mutex_lock(&mess_mutex);
-	message.type = OPEN;
-	message.data = x;
-	pthread_mutex_unlock(&mess_mutex);
+	
+	if(ndevices <= x->index){
+		post("Cannot open Kinect device %d, only % are connected.", x->index, ndevices);
+		x->index = 0;
+		return;
+	}
+	
+	//Find out which device to open
+	dev_ndx = x->index;
+	if(!dev_ndx){
+		int found = 0;
+		while(!found){
+			found = 1;
+			for(i=0;i<object_list.count;i++){
+				if(object_list.objects[i]->device){
+					if(object_list.objects[i]->index-1 == dev_ndx){
+						found = 0;
+						break;
+					}
+				}
+			}
+			dev_ndx++;
+		}
+		x->index = dev_ndx;
+	}
+	
+	post("Opening Kinect device %d", dev_ndx);
+	
+	if (freenect_open_device(f_ctx, &(x->device), dev_ndx-1) < 0) {
+		error("Could not open Kinect device %d", dev_ndx);
+		x->index = 0;
+		x->device = NULL;
+	}
+	
+	freenect_set_depth_callback(x->device, depth_callback);
+	freenect_set_rgb_callback(x->device, rgb_callback);
+	freenect_set_rgb_format(x->device, FREENECT_FORMAT_RGB);
+	
+	//Store a pointer to this object in the freenect device struct (for use in callbacks)
+	freenect_set_user(x->device, x);  
+	
+	freenect_set_led(x->device,LED_RED);
+	
+	freenect_set_tilt_degs(x->device,x->tilt);
+	
+	freenect_start_depth(x->device);
+	freenect_start_rgb(x->device);
 }
 
 void jit_freenect_close(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
-	pthread_mutex_lock(&mess_mutex);
-	message.type = CLOSE;
-	message.data = x;
-	pthread_mutex_unlock(&mess_mutex);
+	if(!x->device)return;
+	post("Closing Kinect device %d", x->index);
+	freenect_set_led(x->device,LED_BLINK_GREEN);
+	freenect_close_device(x->device);
+	x->device = NULL;
 }
 
 t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs)
@@ -732,7 +622,6 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 	t_jit_matrix_info depth_minfo,rgb_minfo;
 	void *depth_matrix,*rgb_matrix;
 	char *depth_bp, *rgb_bp;
-	int i;
 			
 	depth_matrix = jit_object_method(outputs,_jit_sym_getindex,0); 
 	rgb_matrix = jit_object_method(outputs,_jit_sym_getindex,1); 
@@ -788,21 +677,13 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 		//Grab and copy matrices
 		x->has_frames = 0;  //Assume there are no new frames
 		
-		for(i=0;i<device_list.count;i++){
-			if(device_list.devices[i].device == x->device){
-				if(device_list.devices[i].have_frames > 1){ //2 or more new frames: depth and rgb
-					pthread_mutex_lock(&list_mutex);
-					device_list.devices[i].have_frames = 0; //Reset the frame counter
-					pthread_mutex_unlock(&list_mutex);
-					
-					x->timestamp = MAX(device_list.devices[i].rgb_timestamp,device_list.devices[i].depth_timestamp);
-					x->has_frames = 1; //We have new frames to output in "unique" mode
-					
-					//TODO: it might be worth sending these to their own threads for performance - jmp
-					copy_depth_data(device_list.devices[i].depth_data, depth_bp, &depth_minfo, &x->lut);
-					copy_rgb_data(device_list.devices[i].rgb_data, rgb_bp, &rgb_minfo);
-				}
-			}
+		if(x->have_frames > 1){ //2 or more new frames: depth and rgb
+			x->have_frames = 0;			
+			x->timestamp = MAX(x->rgb_timestamp,x->depth_timestamp);
+			x->has_frames = 1; //We have new frames to output in "unique" mode
+			
+			copy_depth_data(x->depth_data, depth_bp, &depth_minfo, &x->lut);
+			copy_rgb_data(x->rgb_data, rgb_bp, &rgb_minfo);
 		}
 		
 	} else {
@@ -818,9 +699,6 @@ out:
 void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut)
 {
 	int i,j;
-	//float4 vec_a, vec_b;
-	
-	//float *out;
 	freenect_depth *in;
 	
 	if(!source){
@@ -864,89 +742,6 @@ void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *de
 			}
 		}
 	}
-	
-	/*
-	if(mode == 1){ //Normalize 0-1
-		for(i=0;i<DEPTH_HEIGHT;i++){
-			out = (float *)(out_bp + dest_info->dimstride[1] * i);
-			for(j=0;j<DEPTH_WIDTH;j+=4){
-				
-				vec_a[0] = (float)in[0];
-				vec_a[1] = (float)in[1];
-				vec_a[2] = (float)in[2];
-				vec_a[3] = (float)in[3];
-				
-				//The macros below are to ensure that the multiplication is vectorized (SSE)
-				mult_scalar_float4(vec_a, (1.f / (float)0x7FF), vec_b); //Kinect depth is 11 bits in a 16-bit short, normalize to 0-1
-				copy_float4(vec_b, out);
-				
-				out += 4;
-				in += 4;
-			}
-		}
-	}
-	else if(mode == 2){ //Normalize 1-0
-		float4 vec_c;
-		vec_c[0] = vec_c[1] = vec_c[2] = vec_c[3] = 1.f;
-		for(i=0;i<DEPTH_HEIGHT;i++){
-			out = (float *)(out_bp + dest_info->dimstride[1] * i);
-			for(j=0;j<DEPTH_WIDTH;j+=4){
-				
-				vec_a[0] = (float)in[0];
-				vec_a[1] = (float)in[1];
-				vec_a[2] = (float)in[2];
-				vec_a[3] = (float)in[3];
-				
-				//The macros below are to ensure that the multiplication is vectorized (SSE)
-				mult_scalar_float4(vec_a, (1.f / (float)0x7FF), vec_b); //Kinect depth is 11 bits in a 16-bit short, normalize to 0-1
-				sub_float4(vec_c, vec_b, vec_a);
-				copy_float4(vec_a, out);
-				
-				out += 4;
-				in += 4;
-			}
-		}
-	}
-	else if(mode == 3){ //Distance
-		for(i=0;i<DEPTH_HEIGHT;i++){
-			out = (float *)(out_bp + dest_info->dimstride[1] * i);
-			for(j=0;j<DEPTH_WIDTH;j+=4){
-				
-				vec_a[0] = (float)in[0];
-				vec_a[1] = (float)in[1];
-				vec_a[2] = (float)in[2];
-				vec_a[3] = (float)in[3];
-				
-				//from https://github.com/OpenKinect/openkinect/wiki/Imaging-Information
-				// distance = 100 / (3.33 + depth * -0.00307)
-				mult_scalar_float4(vec_a, -0.00307f, vec_b);
-				add_scalar_float4(vec_b, 3.33f, vec_a);
-				div_scalar_float4_inv(vec_a, 100.f, vec_b);
-				
-				copy_float4(vec_b, out);
-				
-				out += 4;
-				in += 4;
-			}
-		}
-	}
-	else{ //Raw
-		for(i=0;i<DEPTH_HEIGHT;i++){
-			out = (float *)(out_bp + dest_info->dimstride[1] * i);
-			for(j=0;j<DEPTH_WIDTH;j+=4){
-				
-				out[0] = (float)in[0];
-				out[1] = (float)in[1];
-				out[2] = (float)in[2];
-				out[3] = (float)in[3];
-				
-				out += 4;
-				in += 4;
-			}
-		}
-	}
-	 */
-	
 }
 
 void copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest_info)
@@ -982,31 +777,25 @@ void copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest
 }
 
 void rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp){
-	int i;
+	t_jit_freenect_grab *x;
 	
-	for(i=0;i<device_list.count;i++){
-		if(device_list.devices[i].device == dev){
-			pthread_mutex_lock(&list_mutex);
-			device_list.devices[i].rgb_data = pixels;
-			device_list.devices[i].rgb_timestamp = timestamp;
-			device_list.devices[i].have_frames++;
-			pthread_mutex_unlock(&list_mutex);
-			break;
-		}
-	}
+	x = freenect_get_user(dev);
+	
+	if(!x)return;
+	
+	x->rgb_data = pixels;
+	x->rgb_timestamp = timestamp;
+	x->have_frames++;
 }
 
 void depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
-	int i;
+	t_jit_freenect_grab *x;
 	
-	for(i=0;i<device_list.count;i++){
-		if(device_list.devices[i].device == dev){
-			pthread_mutex_lock(&list_mutex);
-			device_list.devices[i].depth_data = pixels;
-			device_list.devices[i].depth_timestamp = timestamp;
-			device_list.devices[i].have_frames++;
-			pthread_mutex_unlock(&list_mutex);
-			break;
-		}
-	}
+	x = freenect_get_user(dev);
+	
+	if(!x)return;
+	
+	x->depth_data = pixels;
+	x->depth_timestamp = timestamp;
+	x->have_frames++;
 }

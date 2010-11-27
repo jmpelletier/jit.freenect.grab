@@ -277,14 +277,17 @@
 				GENERATE_PKGINFO_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/../libfreenect/include",
+					/usr/local/include/,
 					"/usr/local/include/libusb-1.0/",
 					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_2)",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_3)",
+					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_4)",
+					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_5)",
 				);
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../libusb/libusb\"";
+				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../c74support/jit-includes\"";
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_2 = "\"$(SRCROOT)/../c74support/jit-includes\"";
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_3 = "\"$(SRCROOT)/../c74support/max-includes\"";
+				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_4 = "\"$(SRCROOT)/../c74support/max-includes\"";
+				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_5 = "\"$(SRCROOT)/../libusb/libusb\"";
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = /build/development/;
 				LIBRARY_SEARCH_PATHS = "\"$(SRCROOT)/lib\"";
@@ -324,27 +327,33 @@
 				);
 				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)\"";
 				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_2 = "\"$(SRCROOT)/../c74support/jit-includes\"";
+				GCC_AUTO_VECTORIZATION = YES;
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				GCC_ENABLE_SSE3_EXTENSIONS = YES;
+				GCC_ENABLE_SSE41_EXTENSIONS = YES;
+				GCC_ENABLE_SSE42_EXTENSIONS = YES;
 				GCC_ENABLE_TRIGRAPHS = NO;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "../c74support/max-includes/macho-prefix.pch";
+				GCC_UNROLL_LOOPS = YES;
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = NO;
 				GCC_WARN_FOUR_CHARACTER_CONSTANTS = NO;
 				GCC_WARN_UNKNOWN_PRAGMAS = NO;
 				GENERATE_PKGINFO_FILE = YES;
 				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../libfreenect/include",
+					/usr/local/include/,
+					"/usr/local/include/libusb-1.0/",
+					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
 					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_4)",
 					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_5)",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_6)",
-					"/usr/local/include/libusb-1.0/",
 				);
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../OpenKinect-libfreenect/c/include\"";
+				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../c74support/jit-includes\"";
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_2 = "\"$(SRCROOT)/../c74support/jit-includes\"";
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_3 = "\"$(SRCROOT)/../c74support/max-includes\"";
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_4 = "\"$(SRCROOT)/../c74support/max-includes\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_5 = "\"$(SRCROOT)/../c74support/jit-includes\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_6 = "\"$(SRCROOT)/../libfreenect/c/include\"";
+				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_5 = "\"$(SRCROOT)/../libusb/libusb\"";
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = /build/deployment/;
 				LIBRARY_SEARCH_PATHS = "\"$(SRCROOT)/lib\"";
@@ -357,7 +366,7 @@
 				);
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = jit.freenect.grab;
-				SDKROOT = "";
+				SDKROOT = /Developer/SDKs/MacOSX10.5.sdk;
 				SECTORDER_FLAGS = "";
 				USER_HEADER_SEARCH_PATHS = "";
 				WARNING_CFLAGS = (
@@ -369,63 +378,6 @@
 				ZERO_LINK = NO;
 			};
 			name = Deployment;
-		};
-		0FF65FF3096B38E400E9E0B4 /* Default */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = i386;
-				DEPLOYMENT_LOCATION = YES;
-				DSTROOT = "$(PROJECT_DIR)";
-				FRAMEWORK_SEARCH_PATHS = (
-					/Library/Frameworks,
-					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
-					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_2)",
-				);
-				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)\"";
-				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_2 = "\"$(SRCROOT)/../c74support/jit-includes\"";
-				GCC_ENABLE_TRIGRAPHS = NO;
-				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
-				GCC_PREFIX_HEADER = "../c74support/max-includes/macho-prefix.pch";
-				GCC_WARN_ABOUT_MISSING_PROTOTYPES = NO;
-				GCC_WARN_FOUR_CHARACTER_CONSTANTS = NO;
-				GCC_WARN_UNKNOWN_PRAGMAS = NO;
-				GENERATE_PKGINFO_FILE = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_4)",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_5)",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_6)",
-					"/usr/local/include/libusb-1.0/",
-				);
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../OpenKinect-libfreenect/c/include\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_2 = "\"$(SRCROOT)/../c74support/jit-includes\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_3 = "\"$(SRCROOT)/../c74support/max-includes\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_4 = "\"$(SRCROOT)/../c74support/max-includes\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_5 = "\"$(SRCROOT)/../c74support/jit-includes\"";
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_6 = "\"$(SRCROOT)/../libfreenect/c/include\"";
-				INFOPLIST_FILE = Info.plist;
-				INSTALL_PATH = "/../../../sysbuild/$(CONFIGURATION)/Cycling '74/jitter-externals";
-				LIBRARY_SEARCH_PATHS = "\"$(SRCROOT)/lib\"";
-				LIBRARY_STYLE = Bundle;
-				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = (
-					"-Wl",
-					"-search_paths_first",
-					"-lmx",
-				);
-				OTHER_REZFLAGS = "";
-				PRODUCT_NAME = jit.freenect.grab;
-				SDKROOT = "";
-				SECTORDER_FLAGS = "";
-				USER_HEADER_SEARCH_PATHS = "";
-				WARNING_CFLAGS = (
-					"-Wmost",
-					"-Wno-four-char-constants",
-					"-Wno-unknown-pragmas",
-				);
-				WRAPPER_EXTENSION = mxo;
-			};
-			name = Default;
 		};
 		0FF65FF5096B38E400E9E0B4 /* Development */ = {
 			isa = XCBuildConfiguration;
@@ -445,15 +397,6 @@
 			};
 			name = Deployment;
 		};
-		0FF65FF7096B38E400E9E0B4 /* Default */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
-				SDKROOT = "";
-				USER_HEADER_SEARCH_PATHS = "../../c74support/**";
-			};
-			name = Default;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -462,20 +405,18 @@
 			buildConfigurations = (
 				0FF65FF1096B38E400E9E0B4 /* Development */,
 				0FF65FF2096B38E400E9E0B4 /* Deployment */,
-				0FF65FF3096B38E400E9E0B4 /* Default */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Default;
+			defaultConfigurationName = Development;
 		};
 		0FF65FF4096B38E400E9E0B4 /* Build configuration list for PBXProject "max.jit.freenect.grab" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				0FF65FF5096B38E400E9E0B4 /* Development */,
 				0FF65FF6096B38E400E9E0B4 /* Deployment */,
-				0FF65FF7096B38E400E9E0B4 /* Default */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Default;
+			defaultConfigurationName = Development;
 		};
 /* End XCConfigurationList section */
 	};
