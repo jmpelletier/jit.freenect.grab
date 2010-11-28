@@ -55,7 +55,7 @@ typedef struct _jit_freenect_grab
 	uint32_t         timestamp;
 	t_lookup         lut;
 	t_symbol         *lut_type;
-	long             tilt;
+	double             tilt;
 	long             accelcount;
 	double           mks_accel[3];
 	freenect_pixel   *rgb_data;
@@ -63,6 +63,8 @@ typedef struct _jit_freenect_grab
 	uint32_t         rgb_timestamp;
 	uint32_t         depth_timestamp;
 	char             have_frames;
+	freenect_raw_device_state* state;
+	
 } t_jit_freenect_grab;
 
 typedef struct _obj_list
@@ -83,6 +85,7 @@ void                    jit_freenect_close(t_jit_freenect_grab *x, t_symbol *s, 
 t_jit_err               jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
 t_jit_err               jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
 void					jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv);
+t_jit_err				jit_freenect_get_tilt(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
 
 t_jit_err               jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av);
 
@@ -356,8 +359,8 @@ t_jit_err jit_freenect_grab_init(void)
 										  attrflags,(method)NULL,(method)jit_freenect_set_mode,calcoffset(t_jit_freenect_grab,mode));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
-	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"tilt",_jit_sym_long,
-										  attrflags,(method)NULL,(method)jit_freenect_set_tilt,calcoffset(t_jit_freenect_grab,tilt));
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"tilt",_jit_sym_float64,
+										  attrflags,(method)jit_freenect_get_tilt,(method)jit_freenect_set_tilt,calcoffset(t_jit_freenect_grab,tilt));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_OPAQUE;
@@ -460,7 +463,8 @@ t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, lon
 
 t_jit_err jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
 	double ax=0,ay=0,az=0;
-	
+
+
 	if ((*ac)&&(*av)) {
 		
 	} else {
@@ -472,7 +476,11 @@ t_jit_err jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *
 	}
 
 	if(x->device){
-		freenect_get_mks_accel(x->device, &ax, &ay, &az);
+		freenect_update_device_state(x->device);
+		x->state = freenect_get_device_state(x->device);
+		if (x->state)
+			freenect_get_mks_accel(x->state, &ax, &ay, &az);
+		
 	}
 	
 	jit_atom_setfloat(*av, ax);
@@ -499,8 +507,8 @@ t_jit_err jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_a
 void jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv)
 {
 	if(argv){
-		x->tilt = jit_atom_getlong(argv);
-		
+		x->tilt = jit_atom_getfloat(argv);
+
 		CLIP(x->tilt, -30, 30);
 		
 		if(x->device){
@@ -508,6 +516,34 @@ void jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_ato
 		}
 	}
 }
+t_jit_err jit_freenect_get_tilt(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
+	double tilt=0;
+	
+	
+	if ((*ac)&&(*av)) {
+		
+	} else {
+		*ac = 1;
+		if (!(*av = jit_getbytes(sizeof(t_atom)*(*ac)))) {
+			*ac = 0;
+			return JIT_ERR_OUT_OF_MEM;
+		}
+	}
+	
+	if(x->device){
+		freenect_update_device_state(x->device);
+		x->state = freenect_get_device_state(x->device);
+		if (x->state)
+			tilt = freenect_get_tilt_degs(x->state);
+		
+	}
+	
+	jit_atom_setfloat(*av, tilt);
+
+	
+	return JIT_ERR_NONE;
+}
+
 
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {

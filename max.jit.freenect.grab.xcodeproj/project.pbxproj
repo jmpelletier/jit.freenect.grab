@@ -8,9 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		8D01CCCE0486CAD60068D4B7 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */; };
-		B436001C1293FD6B00228EA0 /* MaxAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B436001B1293FD6B00228EA0 /* MaxAPI.framework */; };
 		B43600621293FD7500228EA0 /* JitterAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B43600611293FD7500228EA0 /* JitterAPI.framework */; };
-		B43600C71294058400228EA0 /* inits.c in Sources */ = {isa = PBXBuildFile; fileRef = B43600C61294058400228EA0 /* inits.c */; };
 		B4578CBC129CAF17004A0DF2 /* cameras.c in Sources */ = {isa = PBXBuildFile; fileRef = B4578CB6129CAF17004A0DF2 /* cameras.c */; };
 		B4578CBD129CAF17004A0DF2 /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = B4578CB7129CAF17004A0DF2 /* core.c */; };
 		B4578CBE129CAF17004A0DF2 /* freenect_internal.h in Headers */ = {isa = PBXBuildFile; fileRef = B4578CB8129CAF17004A0DF2 /* freenect_internal.h */; };
@@ -26,13 +24,13 @@
 		B4B4AEF61293DBE600B34CB3 /* jit.freenect.grab.c in Sources */ = {isa = PBXBuildFile; fileRef = B4B4AEF41293DBE600B34CB3 /* jit.freenect.grab.c */; };
 		B4B4AEF71293DBE600B34CB3 /* max.jit.freenect.grab.c in Sources */ = {isa = PBXBuildFile; fileRef = B4B4AEF51293DBE600B34CB3 /* max.jit.freenect.grab.c */; };
 		B4BFD6B51294CE0400BACB4B /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B4BFD6B41294CE0400BACB4B /* IOKit.framework */; };
+		FE0C1A5512A30E3800A84E34 /* MaxAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FE0C1A5412A30E3800A84E34 /* MaxAPI.framework */; };
+		FE0C1AA012A30ECB00A84E34 /* accel.c in Sources */ = {isa = PBXBuildFile; fileRef = FE0C1A9F12A30ECB00A84E34 /* accel.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = /System/Library/Frameworks/Carbon.framework; sourceTree = "<absolute>"; };
-		B436001B1293FD6B00228EA0 /* MaxAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = MaxAPI.framework; sourceTree = "<group>"; };
 		B43600611293FD7500228EA0 /* JitterAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JitterAPI.framework; path = "../c74support/jit-includes/JitterAPI.framework"; sourceTree = SOURCE_ROOT; };
-		B43600C61294058400228EA0 /* inits.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = inits.c; path = ../libfreenect/c/lib/inits.c; sourceTree = SOURCE_ROOT; };
 		B4578CB6129CAF17004A0DF2 /* cameras.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cameras.c; path = ../libfreenect/src/cameras.c; sourceTree = SOURCE_ROOT; };
 		B4578CB7129CAF17004A0DF2 /* core.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = core.c; path = ../libfreenect/src/core.c; sourceTree = SOURCE_ROOT; };
 		B4578CB8129CAF17004A0DF2 /* freenect_internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = freenect_internal.h; path = ../libfreenect/src/freenect_internal.h; sourceTree = SOURCE_ROOT; };
@@ -49,6 +47,8 @@
 		B4B4AEF51293DBE600B34CB3 /* max.jit.freenect.grab.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = max.jit.freenect.grab.c; sourceTree = "<group>"; };
 		B4B4AEF81293DBE600B34CB3 /* jit.freenect.grab.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = jit.freenect.grab.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4BFD6B41294CE0400BACB4B /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = /System/Library/Frameworks/IOKit.framework; sourceTree = "<absolute>"; };
+		FE0C1A5412A30E3800A84E34 /* MaxAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MaxAPI.framework; path = "../c74support/max-includes/MaxAPI.framework"; sourceTree = SOURCE_ROOT; };
+		FE0C1A9F12A30ECB00A84E34 /* accel.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = accel.c; path = ../libfreenect/src/accel.c; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,9 +57,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				8D01CCCE0486CAD60068D4B7 /* Carbon.framework in Frameworks */,
-				B436001C1293FD6B00228EA0 /* MaxAPI.framework in Frameworks */,
 				B43600621293FD7500228EA0 /* JitterAPI.framework in Frameworks */,
 				B4BFD6B51294CE0400BACB4B /* IOKit.framework in Frameworks */,
+				FE0C1A5512A30E3800A84E34 /* MaxAPI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -82,8 +82,8 @@
 		089C1671FE841209C02AAC07 /* External Frameworks and Libraries */ = {
 			isa = PBXGroup;
 			children = (
+				FE0C1A5412A30E3800A84E34 /* MaxAPI.framework */,
 				B43600611293FD7500228EA0 /* JitterAPI.framework */,
-				B436001B1293FD6B00228EA0 /* MaxAPI.framework */,
 				08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */,
 				B4BFD6B41294CE0400BACB4B /* IOKit.framework */,
 			);
@@ -130,13 +130,13 @@
 		B4B4AF031293DC7C00B34CB3 /* freenect source */ = {
 			isa = PBXGroup;
 			children = (
+				FE0C1A9F12A30ECB00A84E34 /* accel.c */,
 				B4578CB6129CAF17004A0DF2 /* cameras.c */,
 				B4578CB7129CAF17004A0DF2 /* core.c */,
 				B4578CB8129CAF17004A0DF2 /* freenect_internal.h */,
 				B4578CB9129CAF17004A0DF2 /* tilt.c */,
 				B4578CBA129CAF17004A0DF2 /* usb_libusb10.c */,
 				B4578CBB129CAF17004A0DF2 /* usb_libusb10.h */,
-				B43600C61294058400228EA0 /* inits.c */,
 			);
 			name = "freenect source";
 			sourceTree = "<group>";
@@ -184,7 +184,6 @@
 			isa = PBXProject;
 			buildConfigurationList = 0FF65FF4096B38E400E9E0B4 /* Build configuration list for PBXProject "max.jit.freenect.grab" */;
 			compatibilityVersion = "Xcode 2.4";
-			developmentRegion = English;
 			hasScannedForEncodings = 1;
 			knownRegions = (
 				English,
@@ -228,7 +227,6 @@
 			files = (
 				B4B4AEF61293DBE600B34CB3 /* jit.freenect.grab.c in Sources */,
 				B4B4AEF71293DBE600B34CB3 /* max.jit.freenect.grab.c in Sources */,
-				B43600C71294058400228EA0 /* inits.c in Sources */,
 				B4793DA51299030800A44AF1 /* core.c in Sources */,
 				B4793DA61299030800A44AF1 /* descriptor.c in Sources */,
 				B4793DA71299030800A44AF1 /* io.c in Sources */,
@@ -238,6 +236,7 @@
 				B4578CBD129CAF17004A0DF2 /* core.c in Sources */,
 				B4578CBF129CAF17004A0DF2 /* tilt.c in Sources */,
 				B4578CC0129CAF17004A0DF2 /* usb_libusb10.c in Sources */,
+				FE0C1AA012A30ECB00A84E34 /* accel.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,9 +255,11 @@
 					/Library/Frameworks,
 					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
 					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_2)",
+					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_3)",
 				);
 				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)\"";
 				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_2 = "\"$(SRCROOT)/../c74support/jit-includes\"";
+				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_3 = "\"$(DEVELOPER_DIR)/c74support/max-includes\"";
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_ENABLE_SSE3_EXTENSIONS = YES;
@@ -324,9 +325,11 @@
 					/Library/Frameworks,
 					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
 					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_2)",
+					"$(FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_3)",
 				);
 				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)\"";
 				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_2 = "\"$(SRCROOT)/../c74support/jit-includes\"";
+				FRAMEWORK_SEARCH_PATHS_QUOTED_FOR_TARGET_3 = "\"$(DEVELOPER_DIR)/c74support/max-includes\"";
 				GCC_AUTO_VECTORIZATION = YES;
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
 				GCC_ENABLE_SSE3_EXTENSIONS = YES;
