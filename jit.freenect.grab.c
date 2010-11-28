@@ -22,6 +22,7 @@
 #include "jit.common.h"
 #include <libusb.h>
 #include "libfreenect.h"
+#include "freenect_internal.h"
 #include <time.h>
 
 #define DEPTH_WIDTH 640
@@ -93,13 +94,13 @@ void                    copy_rgb_data(freenect_pixel *source, char *out_bp, t_ji
 void                    rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp);
 void                    depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
 
-pthread_t       capture_thread;
-int terminate_thread;
+pthread_t capture_thread;
+int       terminate_thread;
 
 int object_count = 0;
 
 freenect_context *f_ctx = NULL;
-t_obj_list       object_list;
+//t_obj_list       object_list;
 
 static int obj_list_push(t_obj_list *list, t_jit_freenect_grab *x){
 	t_jit_freenect_grab **tmp;
@@ -262,33 +263,42 @@ void *capture_threadfunc(void *arg)
 	int i;
 	int process_events = 0;
 	
+	freenect_context *context;
+		
 	if(!f_ctx){
-		if (freenect_init(&f_ctx, NULL) < 0) {
+		if (freenect_init(&context, NULL) < 0) {
 			printf("freenect_init() failed\n");
 			goto out;
 		}
 	}
 	
+	f_ctx = context;
+	
 	terminate_thread = 0;
 		
 	while(!terminate_thread){
+		/*
 		process_events = 0;
 		for(i=0;i<object_list.count;i++){
 			if(object_list.objects[i]->device)
 				process_events = 1;
-			
-			sleep(0);
 		}
 		
 		if(process_events){
+		*/
+		if(f_ctx->first){
 			if(freenect_process_events(f_ctx) < 0){
 				error("Could not process events.");
 				break;
 			}
 		}
+		
+		sleep(0);
 	}
 	
-out:	
+out:
+	freenect_shutdown(f_ctx);
+	f_ctx = NULL;
 	pthread_exit(NULL);
 	return NULL;
 }
@@ -381,9 +391,9 @@ t_jit_err jit_freenect_grab_init(void)
 	
 	jit_class_register(_jit_freenect_grab_class);
 		
-	object_list.objects = NULL;
-	object_list.count = 0;
-	
+	//object_list.objects = NULL;
+	//object_list.count = 0;
+		
 	return JIT_ERR_NONE;
 }
 
@@ -403,14 +413,16 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->lut_type = NULL;
 		x->tilt = 0;
 		
-		if(object_list.count == 0){
+		//if(object_list.count == 0){
+		/*
+		if(!f_ctx){
 			if (pthread_create(&capture_thread, NULL, capture_threadfunc, NULL)) {
 				error("Failed to create capture thread.");
 				return NULL;
 			}
 		}
-		
-		obj_list_push(&object_list, x);
+		*/
+		//obj_list_push(&object_list, x);
 		
 	} else {
 		x = NULL;
@@ -422,15 +434,17 @@ void jit_freenect_grab_free(t_jit_freenect_grab *x)
 {
 	jit_freenect_close(x, NULL, 0, NULL);
 		
-	obj_list_remove_item(&object_list, x);
+	//obj_list_remove_item(&object_list, x);
 	
 	if(x->lut.f_ptr){
 		free(x->lut.f_ptr);
 	}
 	
+	/*
 	if(object_list.count == 0){
 		terminate_thread = 1;
 	}
+	 */
 }
 
 t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
@@ -512,14 +526,27 @@ void jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_ato
 void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
 	int ndevices, i, devices_left, dev_ndx;
+	t_jit_freenect_grab *y;
+	freenect_device *dev;
+	/*
 	if(!f_ctx){
 		error("Invalid context!");
 		return;
 	}
-	
+	*/
 	if(x->device){
 		post("A device is already open.");
 		return;
+	}
+	
+	if(!f_ctx){
+		if (pthread_create(&capture_thread, NULL, capture_threadfunc, NULL)) {
+			error("Failed to create capture thread.");
+			return;
+		}
+		while(!f_ctx){
+			sleep(0);
+		}
 	}
 	
 	ndevices = freenect_num_devices(f_ctx);
@@ -530,11 +557,18 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 	}
 	
 	devices_left = ndevices;
-	
+	dev = f_ctx->first;
+	while(dev){
+		dev = dev->next;
+		devices_left--;
+	}
+	/*
 	for(i=0;i<object_list.count;i++){
 		if(object_list.objects[i]->device)
 			devices_left--;
 	}
+	 */
+	
 	if(!devices_left){
 		post("All Kinect devices are currently in use.");
 		return;
@@ -547,6 +581,18 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 		//Is the device already in use?
 		x->index = jit_atom_getlong(argv);
 		
+		dev = f_ctx->first;
+		while(dev){
+			y = freenect_get_user(dev);
+			if(y->index == x->index){
+				post("Kinect device %d is already in use.", x->index);
+				x->index = 0;
+				return;
+			}
+			dev = dev->next;
+		}
+		
+		/*
 		for(i=0;i<object_list.count;i++){
 			if(object_list.objects[i]->device){
 				if(object_list.objects[i]->index == x->index){
@@ -556,10 +602,11 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 				}
 			}
 		}
+		 */
 	}
 	
-	if(ndevices <= x->index){
-		post("Cannot open Kinect device %d, only % are connected.", x->index, ndevices);
+	if(x->index > ndevices){
+		post("Cannot open Kinect device %d, only %d are connected.", x->index, ndevices);
 		x->index = 0;
 		return;
 	}
@@ -570,6 +617,16 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 		int found = 0;
 		while(!found){
 			found = 1;
+			dev = f_ctx->first;
+			while(dev){
+				y = freenect_get_user(dev);
+				if(y->index-1 == dev_ndx){
+					found = 0;
+					break;
+				}
+				dev = dev->next;
+			}
+			/*
 			for(i=0;i<object_list.count;i++){
 				if(object_list.objects[i]->device){
 					if(object_list.objects[i]->index-1 == dev_ndx){
@@ -578,12 +635,13 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 					}
 				}
 			}
+			 */
 			dev_ndx++;
 		}
 		x->index = dev_ndx;
 	}
 	
-	post("Opening Kinect device %d", dev_ndx);
+	//post("Opening Kinect device %d", dev_ndx);
 	
 	if (freenect_open_device(f_ctx, &(x->device), dev_ndx-1) < 0) {
 		error("Could not open Kinect device %d", dev_ndx);
@@ -609,10 +667,13 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 void jit_freenect_close(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
 	if(!x->device)return;
-	post("Closing Kinect device %d", x->index);
+	//post("Closing Kinect device %d", x->index);
 	freenect_set_led(x->device,LED_BLINK_GREEN);
 	freenect_close_device(x->device);
 	x->device = NULL;
+	if(!f_ctx->first){
+		terminate_thread = 1;
+	}
 }
 
 t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs)
