@@ -59,11 +59,12 @@ typedef struct _jit_freenect_grab
 	long             tilt;
 	long             accelcount;
 	double           mks_accel[3];
-	freenect_pixel   *rgb_data;
-	freenect_depth   *depth_data;
+	uint8_t          *rgb_data;
+	uint16_t         *depth_data;
 	uint32_t         rgb_timestamp;
 	uint32_t         depth_timestamp;
 	char             have_frames;
+	freenect_raw_tilt_state *state;
 } t_jit_freenect_grab;
 
 typedef struct _obj_list
@@ -78,20 +79,21 @@ t_jit_err               jit_freenect_grab_init(void);
 t_jit_freenect_grab     *jit_freenect_grab_new(void);
 void                    jit_freenect_grab_free(t_jit_freenect_grab *x);
 
-void                    jit_freenect_open(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
-void                    jit_freenect_close(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
+void                    jit_freenect_grab_open(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
+void                    jit_freenect_grab_close(t_jit_freenect_grab *x, t_symbol *s, long argc, t_atom *argv);
 
 t_jit_err               jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
 t_jit_err               jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
-void					jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv);
+t_jit_err               jit_freenect_grab_get_tilt(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
+void					jit_freenect_grab_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv);
 
-t_jit_err               jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av);
+t_jit_err               jit_freenect_grab_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av);
 
 t_jit_err               jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs);
-void                    copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut);
-void                    copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest_info);
+void                    copy_depth_data(uint16_t *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut);
+void                    copy_rgb_data(uint8_t *source, char *out_bp, t_jit_matrix_info *dest_info);
 
-void                    rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp);
+void                    rgb_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
 void                    depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
 
 pthread_t capture_thread;
@@ -100,56 +102,6 @@ int       terminate_thread;
 int object_count = 0;
 
 freenect_context *f_ctx = NULL;
-//t_obj_list       object_list;
-
-static int obj_list_push(t_obj_list *list, t_jit_freenect_grab *x){
-	t_jit_freenect_grab **tmp;
-	
-	if(!list){
-		error("obj_list_push: invalid pointer.");
-		return -1;
-	}
-	
-	tmp = (t_jit_freenect_grab **)realloc(list->objects, (list->count+1)*sizeof(t_jit_freenect_grab *));
-	
-	if(tmp){
-		list->objects = tmp;
-		list->objects[list->count] = x;
-		list->count++;
-	}
-	else{
-		error("list_push: Out of memory.");
-		return -1;
-	}
-	
-	return list->count - 1;
-}
-
-static int obj_list_remove_item(t_obj_list *list, t_jit_freenect_grab *x){
-	int i;
-	
-	if(!list){
-		error("obj_list_remove_item: invalid pointer.");
-		return -1;
-	}
-	
-	for(i=0;i<list->count;i++){
-		if(list->objects[i] == x){
-			for(i++;i<list->count;i++){
-				list->objects[i-1] = list->objects[i];
-			}
-		}
-		list->count--;
-		list->objects[list->count] = NULL;
-	}
-	
-	if(!list->count){
-		free(list->objects);
-		list->objects = NULL;
-	}
-	
-	return list->count;
-}
 
 void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
 	long i;
@@ -259,10 +211,7 @@ void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
 }
 
 void *capture_threadfunc(void *arg)
-{
-	int i;
-	int process_events = 0;
-	
+{	
 	freenect_context *context;
 		
 	if(!f_ctx){
@@ -277,15 +226,6 @@ void *capture_threadfunc(void *arg)
 	terminate_thread = 0;
 		
 	while(!terminate_thread){
-		/*
-		process_events = 0;
-		for(i=0;i<object_list.count;i++){
-			if(object_list.objects[i]->device)
-				process_events = 1;
-		}
-		
-		if(process_events){
-		*/
 		if(f_ctx->first){
 			if(freenect_process_events(f_ctx) < 0){
 				error("Could not process events.");
@@ -350,8 +290,8 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_class_addadornment(_jit_freenect_grab_class,mop);
 	
 	//add methods
-	jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_open, "open", A_GIMME, 0L);
-	jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_close, "close", A_GIMME, 0L);
+	jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_grab_open, "open", A_GIMME, 0L);
+	jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_grab_close, "close", A_GIMME, 0L);
 	
 	jit_class_addmethod(_jit_freenect_grab_class, (method)jit_freenect_grab_matrix_calc, "matrix_calc", A_CANT, 0L);
 	
@@ -363,11 +303,11 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,
-										  attrflags,(method)NULL,(method)jit_freenect_set_mode,calcoffset(t_jit_freenect_grab,mode));
+										  attrflags,(method)NULL,(method)jit_freenect_grab_set_mode,calcoffset(t_jit_freenect_grab,mode));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"tilt",_jit_sym_long,
-										  attrflags,(method)NULL,(method)jit_freenect_set_tilt,calcoffset(t_jit_freenect_grab,tilt));
+										  attrflags,(method)jit_freenect_grab_get_tilt,(method)jit_freenect_grab_set_tilt,calcoffset(t_jit_freenect_grab,tilt));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_OPAQUE;
@@ -391,9 +331,6 @@ t_jit_err jit_freenect_grab_init(void)
 	
 	jit_class_register(_jit_freenect_grab_class);
 		
-	//object_list.objects = NULL;
-	//object_list.count = 0;
-		
 	return JIT_ERR_NONE;
 }
 
@@ -412,18 +349,8 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->lut.f_ptr = NULL;
 		x->lut_type = NULL;
 		x->tilt = 0;
-		
-		//if(object_list.count == 0){
-		/*
-		if(!f_ctx){
-			if (pthread_create(&capture_thread, NULL, capture_threadfunc, NULL)) {
-				error("Failed to create capture thread.");
-				return NULL;
-			}
-		}
-		*/
-		//obj_list_push(&object_list, x);
-		
+		x->state = NULL;
+	
 	} else {
 		x = NULL;
 	}	
@@ -432,19 +359,11 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 
 void jit_freenect_grab_free(t_jit_freenect_grab *x)
 {
-	jit_freenect_close(x, NULL, 0, NULL);
-		
-	//obj_list_remove_item(&object_list, x);
-	
+	jit_freenect_grab_close(x, NULL, 0, NULL);
+			
 	if(x->lut.f_ptr){
 		free(x->lut.f_ptr);
 	}
-	
-	/*
-	if(object_list.count == 0){
-		terminate_thread = 1;
-	}
-	 */
 }
 
 t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
@@ -486,7 +405,10 @@ t_jit_err jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *
 	}
 
 	if(x->device){
-		freenect_get_mks_accel(x->device, &ax, &ay, &az);
+		freenect_update_tilt_state(x->device);
+		x->state = freenect_get_tilt_state(x->device);
+		if (x->state)
+			freenect_get_mks_accel(x->state, &ax, &ay, &az);
 	}
 	
 	jit_atom_setfloat(*av, ax);
@@ -496,7 +418,35 @@ t_jit_err jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *
 	return JIT_ERR_NONE;
 }
 
-t_jit_err jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av){
+t_jit_err jit_freenect_grab_get_tilt(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
+	double tilt=0;
+	
+	
+	if ((*ac)&&(*av)) {
+		
+	} else {
+		*ac = 1;
+		if (!(*av = jit_getbytes(sizeof(t_atom)*(*ac)))) {
+			*ac = 0;
+			return JIT_ERR_OUT_OF_MEM;
+		}
+	}
+	
+	if(x->device){
+		freenect_update_tilt_state(x->device);
+		x->state = freenect_get_tilt_state(x->device);
+		if (x->state)
+			tilt = freenect_get_tilt_degs(x->state);
+		
+	}
+	
+	jit_atom_setfloat(*av, tilt);
+	
+	
+	return JIT_ERR_NONE;
+}
+
+t_jit_err jit_freenect_grab_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av){
     if(ac < 1){
         return JIT_ERR_NONE;
     }
@@ -510,7 +460,7 @@ t_jit_err jit_freenect_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_a
     return JIT_ERR_NONE;
 }
 
-void jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv)
+void jit_freenect_grab_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv)
 {
 	if(argv){
 		x->tilt = jit_atom_getlong(argv);
@@ -523,17 +473,12 @@ void jit_freenect_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_ato
 	}
 }
 
-void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
+void jit_freenect_grab_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
-	int ndevices, i, devices_left, dev_ndx;
+	int ndevices, devices_left, dev_ndx;
 	t_jit_freenect_grab *y;
 	freenect_device *dev;
-	/*
-	if(!f_ctx){
-		error("Invalid context!");
-		return;
-	}
-	*/
+
 	if(x->device){
 		post("A device is already open.");
 		return;
@@ -562,12 +507,6 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 		dev = dev->next;
 		devices_left--;
 	}
-	/*
-	for(i=0;i<object_list.count;i++){
-		if(object_list.objects[i]->device)
-			devices_left--;
-	}
-	 */
 	
 	if(!devices_left){
 		post("All Kinect devices are currently in use.");
@@ -591,18 +530,6 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 			}
 			dev = dev->next;
 		}
-		
-		/*
-		for(i=0;i<object_list.count;i++){
-			if(object_list.objects[i]->device){
-				if(object_list.objects[i]->index == x->index){
-					post("Kinect device %d is already in use.", x->index);
-					x->index = 0;
-					return;
-				}
-			}
-		}
-		 */
 	}
 	
 	if(x->index > ndevices){
@@ -626,23 +553,11 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 				}
 				dev = dev->next;
 			}
-			/*
-			for(i=0;i<object_list.count;i++){
-				if(object_list.objects[i]->device){
-					if(object_list.objects[i]->index-1 == dev_ndx){
-						found = 0;
-						break;
-					}
-				}
-			}
-			 */
 			dev_ndx++;
 		}
 		x->index = dev_ndx;
 	}
-	
-	//post("Opening Kinect device %d", dev_ndx);
-	
+		
 	if (freenect_open_device(f_ctx, &(x->device), dev_ndx-1) < 0) {
 		error("Could not open Kinect device %d", dev_ndx);
 		x->index = 0;
@@ -650,8 +565,8 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 	}
 	
 	freenect_set_depth_callback(x->device, depth_callback);
-	freenect_set_rgb_callback(x->device, rgb_callback);
-	freenect_set_rgb_format(x->device, FREENECT_FORMAT_RGB);
+	freenect_set_video_callback(x->device, rgb_callback);
+	freenect_set_video_format(x->device, FREENECT_VIDEO_RGB);
 	
 	//Store a pointer to this object in the freenect device struct (for use in callbacks)
 	freenect_set_user(x->device, x);  
@@ -661,13 +576,12 @@ void jit_freenect_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *
 	freenect_set_tilt_degs(x->device,x->tilt);
 	
 	freenect_start_depth(x->device);
-	freenect_start_rgb(x->device);
+	freenect_start_video(x->device);
 }
 
-void jit_freenect_close(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
+void jit_freenect_grab_close(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_atom *argv)
 {
 	if(!x->device)return;
-	//post("Closing Kinect device %d", x->index);
 	freenect_set_led(x->device,LED_BLINK_GREEN);
 	freenect_close_device(x->device);
 	x->device = NULL;
@@ -757,10 +671,10 @@ out:
 	return err;
 }
 
-void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut)
+void copy_depth_data(uint16_t *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut)
 {
 	int i,j;
-	freenect_depth *in;
+	uint16_t *in;
 	
 	if(!source){
 		return;	
@@ -805,12 +719,12 @@ void copy_depth_data(freenect_depth *source, char *out_bp, t_jit_matrix_info *de
 	}
 }
 
-void copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest_info)
+void copy_rgb_data(uint8_t *source, char *out_bp, t_jit_matrix_info *dest_info)
 {
 	int i,j;
 	
 	char *out;
-	freenect_pixel *in;
+	uint8_t *in;
 	
 	if(!source){
 		return;
@@ -837,7 +751,7 @@ void copy_rgb_data(freenect_pixel *source, char *out_bp, t_jit_matrix_info *dest
 	}
 }
 
-void rgb_callback(freenect_device *dev, freenect_pixel *pixels, uint32_t timestamp){
+void rgb_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
 	t_jit_freenect_grab *x;
 	
 	x = freenect_get_user(dev);
