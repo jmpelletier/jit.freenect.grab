@@ -63,7 +63,9 @@ typedef struct _jit_freenect_grab
 	uint16_t         *depth_data;
 	uint32_t         rgb_timestamp;
 	uint32_t         depth_timestamp;
-	char             have_frames;
+	char             have_depth_frames;
+	char             have_rgb_frames;
+	char             clear_depth;
 	freenect_raw_tilt_state *state;
 } t_jit_freenect_grab;
 
@@ -302,6 +304,12 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
+	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW;
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"cleardepth",_jit_sym_char,
+										  attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,clear_depth));
+	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,
 										  attrflags,(method)NULL,(method)jit_freenect_grab_set_mode,calcoffset(t_jit_freenect_grab,mode));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
@@ -350,6 +358,7 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->lut_type = NULL;
 		x->tilt = 0;
 		x->state = NULL;
+		x->clear_depth = 0;
 	
 	} else {
 		x = NULL;
@@ -652,13 +661,23 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 		//Grab and copy matrices
 		x->has_frames = 0;  //Assume there are no new frames
 		
-		if(x->have_frames > 1){ //2 or more new frames: depth and rgb
-			x->have_frames = 0;			
+		if(x->have_rgb_frames || x->have_depth_frames){
 			x->timestamp = MAX(x->rgb_timestamp,x->depth_timestamp);
-			x->has_frames = 1; //We have new frames to output in "unique" mode
 			
-			copy_depth_data(x->depth_data, depth_bp, &depth_minfo, &x->lut);
-			copy_rgb_data(x->rgb_data, rgb_bp, &rgb_minfo);
+			if(x->have_rgb_frames){
+				copy_rgb_data(x->rgb_data, rgb_bp, &rgb_minfo);
+				x->have_rgb_frames = 0;
+			}
+			
+			if(x->have_depth_frames){
+				copy_depth_data(x->depth_data, depth_bp, &depth_minfo, &x->lut);
+				x->have_depth_frames = 0;
+				x->has_frames = 1;
+			}
+			else if((x->clear_depth)&&((x->rgb_timestamp - x->depth_timestamp)>3000000)){
+				jit_object_method(depth_matrix, _jit_sym_clear);
+				x->has_frames = 1;
+			}
 		}
 		
 	} else {
@@ -760,7 +779,7 @@ void rgb_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
 	
 	x->rgb_data = pixels;
 	x->rgb_timestamp = timestamp;
-	x->have_frames++;
+	x->have_rgb_frames++;
 }
 
 void depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
@@ -772,5 +791,5 @@ void depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
 	
 	x->depth_data = pixels;
 	x->depth_timestamp = timestamp;
-	x->have_frames++;
+	x->have_depth_frames++;
 }
