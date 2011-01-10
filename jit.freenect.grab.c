@@ -30,6 +30,12 @@
 #define RGB_WIDTH 640
 #define RGB_HEIGHT 480
 #define MAX_DEVICES 8
+#define CLOUD_SIZE (DEPTH_WIDTH+2)*DEPTH_HEIGHT*2
+#define CLOUD_BLOCK 640
+#define DISTANCE_THRESH 10.f * 10.f
+
+typedef float float4[4];
+#define mult_scalar_float4(a,b,c) {int vector_iterator; for(vector_iterator=0;vector_iterator<4;vector_iterator++)c[vector_iterator] = a[vector_iterator] * b;}
 
 typedef union _lookup_data{
 	long *l_ptr;
@@ -44,11 +50,34 @@ enum thread_mess_type{
 	TERMINATE
 };
 
+typedef struct _point3D{
+	float x;
+	float y;
+	float z;
+	float tex_x;
+	float tex_y;
+	float nx;
+	float ny;
+	float nz;
+	float r;
+	float g;
+	float b;
+	float a;
+} t_point3D;
+
+typedef struct _cloud{
+	t_point3D *points;
+	uint32_t count;
+	uint32_t size;
+	t_point3D *last;
+} t_cloud;
+
 typedef struct _jit_freenect_grab
 {
 	t_object         ob;
 	char             unique;
 	char             mode;
+	float            threshold;
 	char             has_frames;
 	long             index;
 	long             ndevices;
@@ -66,6 +95,9 @@ typedef struct _jit_freenect_grab
 	char             have_depth_frames;
 	char             have_rgb_frames;
 	char             clear_depth;
+	t_cloud          cloud;
+	t_symbol         *type;
+	float            *rgb;
 	freenect_raw_tilt_state *state;
 } t_jit_freenect_grab;
 
@@ -74,6 +106,7 @@ typedef struct _obj_list
 	t_jit_freenect_grab **objects;
 	uint32_t count;
 } t_obj_list;
+
 
 void *_jit_freenect_grab_class;
 
@@ -93,6 +126,7 @@ t_jit_err               jit_freenect_grab_set_mode(t_jit_freenect_grab *x, void 
 
 t_jit_err               jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs);
 void                    copy_depth_data(uint16_t *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut);
+void                    build_geometry(t_jit_freenect_grab *x, void *matrix, char *out_bp, t_jit_matrix_info *dest_info);
 void                    copy_rgb_data(uint8_t *source, char *out_bp, t_jit_matrix_info *dest_info);
 
 void                    rgb_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
@@ -104,6 +138,89 @@ int       terminate_thread;
 int object_count = 0;
 
 freenect_context *f_ctx = NULL;
+
+float xlut[640];
+float ylut[480];
+
+static int grow_cloud(t_cloud *cloud){
+	t_point3D *temp = (t_point3D *)realloc(cloud->points, (cloud->size + CLOUD_BLOCK)*sizeof(t_point3D));
+	if(!temp){
+		error("Out of memory, cannot grow cloud.");
+		return 1;
+	}
+	cloud->points = temp;
+	cloud->size += CLOUD_BLOCK;
+	return 0;
+}
+
+static void push_cloud_point(t_cloud *cloud, float x, float y, float z, float tx, float ty, 
+							 float nx, float ny, float nz, float r, float g, float b, float a){
+	if(cloud->count == cloud->size){
+		if(grow_cloud(cloud))return; //Out of memory
+	}
+	cloud->points[cloud->count].x = x;
+	cloud->points[cloud->count].y = y;
+	cloud->points[cloud->count].z = z;
+	cloud->points[cloud->count].tex_x = tx;
+	cloud->points[cloud->count].tex_y = ty;
+	cloud->points[cloud->count].nx = nx;
+	cloud->points[cloud->count].ny = ny;
+	cloud->points[cloud->count].nz = nz;
+	cloud->points[cloud->count].r = r;
+	cloud->points[cloud->count].g = g;
+	cloud->points[cloud->count].b = b;
+	cloud->points[cloud->count].a = a;
+	cloud->count++;
+}
+
+static void start_cloud_point(t_cloud *cloud, float x, float y, float z, float tx, float ty, 
+							  float nx, float ny, float nz, float r, float g, float b, float a){
+	if(cloud->count > (cloud->size - 2)){
+		if(grow_cloud(cloud))return; //Out of memory
+	}
+	cloud->points[cloud->count].x = x;
+	cloud->points[cloud->count].y = y;
+	cloud->points[cloud->count].z = z;
+	cloud->points[cloud->count].tex_x = tx;
+	cloud->points[cloud->count].tex_y = ty;
+	cloud->points[cloud->count].nx = nx;
+	cloud->points[cloud->count].ny = ny;
+	cloud->points[cloud->count].nz = nz;
+	cloud->points[cloud->count].r = r;
+	cloud->points[cloud->count].g = g;
+	cloud->points[cloud->count].b = b;
+	cloud->points[cloud->count].a = a;
+	cloud->count++;
+	cloud->points[cloud->count] = cloud->points[cloud->count-1];
+	cloud->count++;
+}
+
+static void terminate_cloud_point(t_cloud *cloud){
+	if(cloud->count == cloud->size){
+		if(grow_cloud(cloud))return; //Out of memory
+	}
+	cloud->points[cloud->count] = cloud->points[cloud->count-1];
+	cloud->count++;
+}
+
+static void release_cloud(t_cloud *cloud){
+	free(cloud->points);
+	cloud->points = NULL;
+	cloud->count = 0;
+}
+
+static void allocate_cloud(t_cloud *cloud){
+	if(!cloud->points){
+		cloud->points = (t_point3D *)malloc(CLOUD_SIZE*sizeof(t_point3D));
+		if(!cloud->points){
+			cloud->size = 0;
+			cloud->count = 0;
+			error("Out of memory, could not allocate cloud.");
+		}
+		cloud->size = CLOUD_SIZE;
+		cloud->count = 0; 
+	}
+}
 
 void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
 	long i;
@@ -134,8 +251,9 @@ void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
 				}
 				break;
 			case 3:
+			case 4:
 				for(i=0;i<0x800;i++){
-					lut->f_ptr[i] = 100.f / (3.33f + (float)i * -0.00307f);
+					lut->f_ptr[i] = 10.f / (3.33f + (float)i * -0.00307f);
 				} 
 				break;
 		}
@@ -163,7 +281,12 @@ void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
 				break;
 			case 3:
 				for(i=0;i<0x800;i++){
-					lut->l_ptr[i] = (long)(100.f / (3.33f + (float)i * -0.00307f));
+					lut->l_ptr[i] = (long)(-10.f / (3.33f + (float)i * -0.00307f));
+				} 
+				break;
+			case 4:
+				for(i=0;i<0x800;i++){
+					lut->l_ptr[i] = (long)(-10.f / (3.33f + (float)i * -0.00307f));
 				} 
 				break;
 		}
@@ -195,7 +318,12 @@ void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
 				break;
 			case 3:
 				for(i=0;i<0x800;i++){
-					lut->d_ptr[i] = 100.0 / (3.33 + (double)i * -0.00307);
+					lut->d_ptr[i] = -10.0 / (3.33 + (double)i * -0.00307);
+				} 
+				break;
+			case 4:
+				for(i=0;i<0x800;i++){
+					lut->d_ptr[i] = -10.0 / (3.33 + (double)i * -0.00307);
 				} 
 				break;
 		}
@@ -251,8 +379,10 @@ t_jit_err jit_freenect_grab_init(void)
 	t_jit_object *attr;
 	t_jit_object *mop,*output;
 	t_atom a[4];
+	int i;
 	
-	_jit_freenect_grab_class = jit_class_new("jit_freenect_grab",(method)jit_freenect_grab_new,(method)jit_freenect_grab_free, sizeof(t_jit_freenect_grab),0L);
+	_jit_freenect_grab_class = jit_class_new("jit_freenect_grab",(method)jit_freenect_grab_new,
+											 (method)jit_freenect_grab_free, sizeof(t_jit_freenect_grab),0L);
   	
 	//add mop
 	mop = (t_jit_object *)jit_object_new(_jit_sym_jit_mop,0,2); //0 inputs, 2 outputs
@@ -264,9 +394,6 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_atom_setsym(a+1,_jit_sym_long);
 	jit_atom_setsym(a+2,_jit_sym_float64);
 	jit_object_method(output,_jit_sym_types,3,a);
-	
-	jit_attr_setlong(output,_jit_sym_minplanecount,1);
-	jit_attr_setlong(output,_jit_sym_maxplanecount,1);
 	
 	jit_atom_setlong(&a[0], DEPTH_WIDTH);
 	jit_atom_setlong(&a[1], DEPTH_HEIGHT);
@@ -304,6 +431,11 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"threshold",_jit_sym_float32,
+										  attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,threshold));
+	jit_attr_addfilterset_clip(attr,0,0,TRUE,FALSE);
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
 	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW;
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"cleardepth",_jit_sym_char,
 										  attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,clear_depth));
@@ -315,7 +447,8 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"tilt",_jit_sym_long,
-										  attrflags,(method)jit_freenect_grab_get_tilt,(method)jit_freenect_grab_set_tilt,calcoffset(t_jit_freenect_grab,tilt));
+										  attrflags,(method)jit_freenect_grab_get_tilt,(method)jit_freenect_grab_set_tilt,
+										  calcoffset(t_jit_freenect_grab,tilt));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_OPAQUE;
@@ -338,6 +471,16 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	jit_class_register(_jit_freenect_grab_class);
+	
+	//Prepare lut for OpenGL output
+	
+	for(i=0;i<640;i++){
+		xlut[i] = 0.542955699638437f * (((float)i - 319.5f) / 319.5f);
+	}
+	
+	for(i=0;i<480;i++){
+		ylut[i] = -0.393910475614942f * (((float)i - 239.5f) / 239.5f);
+	}
 		
 	return JIT_ERR_NONE;
 }
@@ -351,7 +494,7 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->device = NULL;
 		x->timestamp = 0;
 		x->unique = 0;
-		x->mode = 0;
+		x->mode = 3;
 		x->has_frames = 0;
 		x->ndevices = 0;
 		x->lut.f_ptr = NULL;
@@ -359,7 +502,13 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->tilt = 0;
 		x->state = NULL;
 		x->clear_depth = 0;
-	
+		x->cloud.points = NULL;
+		x->cloud.count = 0;
+		x->cloud.size = 0;
+		x->type = NULL;
+		x->threshold = 2.f;
+		x->rgb = NULL;
+		
 	} else {
 		x = NULL;
 	}	
@@ -373,6 +522,8 @@ void jit_freenect_grab_free(t_jit_freenect_grab *x)
 	if(x->lut.f_ptr){
 		free(x->lut.f_ptr);
 	}
+	
+	release_cloud(&x->cloud);
 }
 
 t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
@@ -461,9 +612,32 @@ t_jit_err jit_freenect_grab_set_mode(t_jit_freenect_grab *x, void *attr, long ac
     }
 	
 	if(x->mode != jit_atom_getlong(av)){
-		x->mode = jit_atom_getlong(av);
-		CLIP(x->mode, 0, 3);
-		calculate_lut(&x->lut, x->lut_type, x->mode);
+		long mode = jit_atom_getlong(av);
+		
+		CLIP(mode, 0, 3);  // <-- See explanation in build_geometry implementation as to why I'm blocking point cloud output for now - jmp 2011-01-11
+		
+		if(mode == 4){
+			if(!x->cloud.points){
+				allocate_cloud(&x->cloud);
+			}
+			if(!x->rgb){
+				x->rgb = malloc(DEPTH_WIDTH*DEPTH_HEIGHT*3*sizeof(float));
+				if(!x->rgb){
+					return JIT_ERR_OUT_OF_MEM;
+				}
+			}
+		}
+		else{
+			release_cloud(&x->cloud);
+			if(x->rgb){
+				free(x->rgb);
+				x->rgb = NULL;
+			}
+		}
+		
+		calculate_lut(&x->lut, x->lut_type, mode);
+		
+		x->mode = mode;
 	}
 	
     return JIT_ERR_NONE;
@@ -607,7 +781,7 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 	void *depth_matrix,*rgb_matrix;
 	char *depth_bp, *rgb_bp;
 			
-	depth_matrix = jit_object_method(outputs,_jit_sym_getindex,0); 
+	depth_matrix = jit_object_method(outputs,_jit_sym_getindex,0);
 	rgb_matrix = jit_object_method(outputs,_jit_sym_getindex,1); 
 	
 	if (x && depth_matrix && rgb_matrix) {
@@ -628,23 +802,29 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 			goto out;
 		}
 		
-		if ((depth_minfo.planecount != 1) || (rgb_minfo.planecount != 4)) //overkill, but you can never be too sure
+		if (rgb_minfo.planecount != 4) //overkill, but you can never be too sure
 		{
 			err=JIT_ERR_MISMATCH_PLANE;
 			goto out;
 		}
 		
-		if ((depth_minfo.dim[0] != DEPTH_WIDTH) || (depth_minfo.dim[1] != DEPTH_HEIGHT) ||
-			(rgb_minfo.dim[0] != RGB_WIDTH) || (rgb_minfo.dim[1] != RGB_HEIGHT)) //overkill, but you can never be too sure
-		{
-			err=JIT_ERR_MISMATCH_DIM;
-			goto out;
+		if(x->type==NULL){
+			x->type = depth_minfo.type;
 		}
 		
-		if ((depth_minfo.dimcount != 2) || (rgb_minfo.dimcount != 2)) //overkill, but you can never be too sure
-		{
-			err=JIT_ERR_MISMATCH_DIM;
-			goto out;
+		if((depth_minfo.planecount != 1)&&(x->mode < 4)){
+			depth_minfo.planecount = 1;
+			depth_minfo.type = x->type;
+			depth_minfo.dimcount = 2;
+			depth_minfo.dim[0] = DEPTH_WIDTH;
+			depth_minfo.dim[1] = DEPTH_HEIGHT;
+			depth_minfo.flags = 0L;
+			jit_object_method(depth_matrix,_jit_sym_setinfo_ex,&depth_minfo);
+			jit_object_method(depth_matrix,_jit_sym_getinfo,&depth_minfo);
+		}
+		
+		if((x->mode < 4)&&(x->type != depth_minfo.type)){
+			x->type = depth_minfo.type;
 		}
 		
 		jit_object_method(depth_matrix,_jit_sym_getdata,&depth_bp);
@@ -670,7 +850,12 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 			}
 			
 			if(x->have_depth_frames){
-				copy_depth_data(x->depth_data, depth_bp, &depth_minfo, &x->lut);
+				if(x->mode == 4){
+					build_geometry(x, depth_matrix, depth_bp, &depth_minfo);
+				}
+				else{
+					copy_depth_data(x->depth_data, depth_bp, &depth_minfo, &x->lut);
+				}
 				x->have_depth_frames = 0;
 				x->has_frames = 1;
 			}
@@ -694,6 +879,7 @@ void copy_depth_data(uint16_t *source, char *out_bp, t_jit_matrix_info *dest_inf
 {
 	int i,j;
 	uint16_t *in;
+	
 	
 	if(!source){
 		return;	
@@ -736,6 +922,140 @@ void copy_depth_data(uint16_t *source, char *out_bp, t_jit_matrix_info *dest_inf
 			}
 		}
 	}
+}
+
+/*
+ 
+ Note: The code below works but frame rate in Max is devilishly slow. Shark reports significant load from
+ jit_matrix_frommatrix_2d_float32. Frame rate on the OpenGL side is also sluggish, more than it should be.
+ It would be better to have a separate external write directly to OpenGL instead of bothering with this
+ point cloud matrix. This is why, for the moment I'm leaving the code, but leaving it unaccessible, as it's
+ near useless as it is. jmp - 2011-01-10
+*/
+
+void build_geometry(t_jit_freenect_grab *x, void *matrix, char *out_bp, t_jit_matrix_info *dest_info){
+	int i,i2,j;
+	uint16_t *in, *in2;
+	float d=0, d2, pd=0, dd;
+	int valid = 0;
+	uint16_t *source = x->depth_data;
+	uint8_t *c, *rgb = x->rgb_data;
+	t_lookup *lut = &x->lut;
+	t_cloud *cloud = &x->cloud;
+	float threshold = x->threshold;
+	float *f, *f2, *frgb = x->rgb;
+	float4 vec;
+	
+	const float xscale = 1.f/DEPTH_WIDTH;
+	const float yscale = 1.f/DEPTH_HEIGHT;
+	const float colscale = 1.f / 255.f;
+	
+	if(!source){
+		return;	
+	}
+	
+	if(!out_bp || !dest_info){
+		error("Invalid pointer in copy_depth_data.");
+		return;
+	}
+	
+	in = source;
+	in2 = source + DEPTH_WIDTH;
+	
+	cloud->count = 0;
+	
+	threshold *= threshold;
+	
+	c = rgb;
+	f = frgb;
+	
+	
+	for(i=0;i<DEPTH_HEIGHT;i++){
+		for(j=0;j<(DEPTH_WIDTH*3);j+=4){
+			vec[0] = (float)c[0];
+			vec[1] = (float)c[1];
+			vec[2] = (float)c[2];
+			vec[3] = (float)c[3];
+			mult_scalar_float4(vec, colscale, f);
+			c+=4;
+			f+=4;
+		}
+	}
+	
+	f = frgb;
+	f2 = frgb + (3 * DEPTH_WIDTH);
+		
+	for(i=0,i2=1;i<(DEPTH_HEIGHT-1);i++,i2++){
+		
+		valid = 0;
+		
+		for(j=0;j<DEPTH_WIDTH;j++){
+			
+			if(*in != 0x7FF){
+				pd = d;
+				d = lut->f_ptr[*in];
+				if(valid){
+					dd = pd - d; dd*=dd;
+					if(dd < threshold){
+						push_cloud_point(cloud, xlut[j] * d, ylut[i] * d, d * -1.f, 
+										 (float)j*xscale, (float)i*yscale,
+										 0.f,0.f,-1.f,
+										 f[0],f[1],f[2],1.f);
+					}
+					else{
+						terminate_cloud_point(cloud);
+						start_cloud_point(cloud, xlut[j] * d, ylut[i] * d, d * -1.f, 
+										  (float)j*xscale, (float)i*yscale,
+										  0.f,0.f,-1.f,
+										  f[0],f[1],f[2],1.f);
+					}
+				}
+				else{
+					start_cloud_point(cloud, xlut[j] * d, ylut[i] * d, d * -1.f, 
+									  (float)j*xscale, (float)i*yscale,
+									  0.f,0.f,-1.f,
+									  f[0],f[1],f[2],1.f);
+					valid = 1;
+				}
+				if(*in2 != 0x7FF){
+					d2 = lut->f_ptr[*in2];
+					dd = d2 - d; dd*=dd;
+					if(dd < threshold){
+						push_cloud_point(cloud, xlut[j] * d2, ylut[i2] * d2, d2 * -1.f, 
+										 (float)j*xscale, (float)i*yscale,
+										 0.f,0.f,-1.f,
+										 f2[0],f2[1],f2[2],1.f);
+					}
+					else{
+						terminate_cloud_point(cloud);
+					}
+				}
+				else{
+					terminate_cloud_point(cloud);
+				}
+			}
+			else if(valid){
+				terminate_cloud_point(cloud);
+				valid = 0;
+			}
+			in++;
+			in2++;
+			f+=3;
+			f2+=3;
+		}
+		
+		if(cloud->count && valid)terminate_cloud_point(cloud);
+	}
+	 	
+	dest_info->type = _jit_sym_float32;
+	dest_info->planecount = 12;
+	dest_info->dimcount = 1;
+	dest_info->dim[0] = cloud->count;
+	dest_info->dimstride[0] = sizeof(t_point3D);
+	dest_info->flags = JIT_MATRIX_DATA_REFERENCE | JIT_MATRIX_DATA_FLAGS_USE;
+	jit_object_method(matrix,_jit_sym_setinfo_ex,dest_info);
+	jit_object_method(matrix,_jit_sym_data,cloud->points);
+	
 }
 
 void copy_rgb_data(uint8_t *source, char *out_bp, t_jit_matrix_info *dest_info)

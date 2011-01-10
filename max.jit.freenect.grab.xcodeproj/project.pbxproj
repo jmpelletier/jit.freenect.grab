@@ -10,7 +10,6 @@
 		8D01CCCE0486CAD60068D4B7 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */; };
 		B436001C1293FD6B00228EA0 /* MaxAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B436001B1293FD6B00228EA0 /* MaxAPI.framework */; };
 		B43600621293FD7500228EA0 /* JitterAPI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B43600611293FD7500228EA0 /* JitterAPI.framework */; };
-		B43600C71294058400228EA0 /* inits.c in Sources */ = {isa = PBXBuildFile; fileRef = B43600C61294058400228EA0 /* inits.c */; };
 		B4578CBC129CAF17004A0DF2 /* cameras.c in Sources */ = {isa = PBXBuildFile; fileRef = B4578CB6129CAF17004A0DF2 /* cameras.c */; };
 		B4578CBD129CAF17004A0DF2 /* core.c in Sources */ = {isa = PBXBuildFile; fileRef = B4578CB7129CAF17004A0DF2 /* core.c */; };
 		B4578CBE129CAF17004A0DF2 /* freenect_internal.h in Headers */ = {isa = PBXBuildFile; fileRef = B4578CB8129CAF17004A0DF2 /* freenect_internal.h */; };
@@ -32,7 +31,6 @@
 		08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = /System/Library/Frameworks/Carbon.framework; sourceTree = "<absolute>"; };
 		B436001B1293FD6B00228EA0 /* MaxAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = MaxAPI.framework; sourceTree = "<group>"; };
 		B43600611293FD7500228EA0 /* JitterAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JitterAPI.framework; path = "../c74support/jit-includes/JitterAPI.framework"; sourceTree = SOURCE_ROOT; };
-		B43600C61294058400228EA0 /* inits.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = inits.c; path = ../libfreenect/c/lib/inits.c; sourceTree = SOURCE_ROOT; };
 		B4578CB6129CAF17004A0DF2 /* cameras.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cameras.c; path = ../libfreenect/src/cameras.c; sourceTree = SOURCE_ROOT; };
 		B4578CB7129CAF17004A0DF2 /* core.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = core.c; path = ../libfreenect/src/core.c; sourceTree = SOURCE_ROOT; };
 		B4578CB8129CAF17004A0DF2 /* freenect_internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = freenect_internal.h; path = ../libfreenect/src/freenect_internal.h; sourceTree = SOURCE_ROOT; };
@@ -136,7 +134,6 @@
 				B4578CB9129CAF17004A0DF2 /* tilt.c */,
 				B4578CBA129CAF17004A0DF2 /* usb_libusb10.c */,
 				B4578CBB129CAF17004A0DF2 /* usb_libusb10.h */,
-				B43600C61294058400228EA0 /* inits.c */,
 			);
 			name = "freenect source";
 			sourceTree = "<group>";
@@ -228,7 +225,6 @@
 			files = (
 				B4B4AEF61293DBE600B34CB3 /* jit.freenect.grab.c in Sources */,
 				B4B4AEF71293DBE600B34CB3 /* max.jit.freenect.grab.c in Sources */,
-				B43600C71294058400228EA0 /* inits.c in Sources */,
 				B4793DA51299030800A44AF1 /* core.c in Sources */,
 				B4793DA61299030800A44AF1 /* descriptor.c in Sources */,
 				B4793DA71299030800A44AF1 /* io.c in Sources */,

@@ -134,9 +134,7 @@ void *max_jit_freenect_grab_new(t_symbol *s, long argc, t_atom *argv)
 				if(argv[0].a_type == A_SYM){
 					t_symbol *s = jit_atom_getsym(argv);
 					if((s == _jit_sym_float32)||(s == _jit_sym_float64)||(s == _jit_sym_long)){
-						//void *mop = max_jit_obex_adornment_get(x,_jit_sym_jit_mop);
 						void *output = max_jit_mop_getoutput(x, 1);
-						//jit_object_method(mop,_jit_sym_type, s);
 						jit_attr_setsym(output, _jit_sym_type, s);
 					}
 					else{
