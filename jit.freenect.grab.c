@@ -81,6 +81,7 @@ typedef struct _jit_freenect_grab
 	char             has_frames;
 	long             index;
 	long             ndevices;
+	t_atom           format;
 	freenect_device  *device;
 	uint32_t         timestamp;
 	t_lookup         lut;
@@ -110,6 +111,9 @@ typedef struct _obj_list
 
 void *_jit_freenect_grab_class;
 
+t_symbol *s_rgb, *s_RGB;
+t_symbol *s_ir, *s_IR;
+
 t_jit_err               jit_freenect_grab_init(void);
 t_jit_freenect_grab     *jit_freenect_grab_new(void);
 void                    jit_freenect_grab_free(t_jit_freenect_grab *x);
@@ -121,12 +125,13 @@ t_jit_err               jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, v
 t_jit_err               jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
 t_jit_err               jit_freenect_grab_get_tilt(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av);
 void					jit_freenect_grab_set_tilt(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv);
+void					jit_freenect_grab_set_format(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv);
 
 t_jit_err               jit_freenect_grab_set_mode(t_jit_freenect_grab *x, void *attr, long ac, t_atom *av);
 
 t_jit_err               jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, void *outputs);
 void                    copy_depth_data(uint16_t *source, char *out_bp, t_jit_matrix_info *dest_info, t_lookup *lut);
-void                    build_geometry(t_jit_freenect_grab *x, void *matrix, char *out_bp, t_jit_matrix_info *dest_info);
+//void                    build_geometry(t_jit_freenect_grab *x, void *matrix, char *out_bp, t_jit_matrix_info *dest_info);
 void                    copy_rgb_data(uint8_t *source, char *out_bp, t_jit_matrix_info *dest_info);
 
 void                    rgb_callback(freenect_device *dev, void *pixels, uint32_t timestamp);
@@ -141,6 +146,8 @@ freenect_context *f_ctx = NULL;
 
 float xlut[640];
 float ylut[480];
+
+/*
 
 static int grow_cloud(t_cloud *cloud){
 	t_point3D *temp = (t_point3D *)realloc(cloud->points, (cloud->size + CLOUD_BLOCK)*sizeof(t_point3D));
@@ -221,6 +228,8 @@ static void allocate_cloud(t_cloud *cloud){
 		cloud->count = 0; 
 	}
 }
+ 
+*/
 
 void calculate_lut(t_lookup *lut, t_symbol *type, int mode){
 	long i;
@@ -381,6 +390,11 @@ t_jit_err jit_freenect_grab_init(void)
 	t_atom a[4];
 	int i;
 	
+	s_rgb = gensym("rgb");
+	s_RGB = gensym("RGB");
+	s_ir = gensym("ir");
+	s_IR = gensym("IR");
+	
 	_jit_freenect_grab_class = jit_class_new("jit_freenect_grab",(method)jit_freenect_grab_new,
 											 (method)jit_freenect_grab_free, sizeof(t_jit_freenect_grab),0L);
   	
@@ -436,7 +450,7 @@ t_jit_err jit_freenect_grab_init(void)
 	jit_attr_addfilterset_clip(attr,0,0,TRUE,FALSE);
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
-	attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW;
+	//attrflags = JIT_ATTR_GET_DEFER_LOW | JIT_ATTR_SET_USURP_LOW;
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"cleardepth",_jit_sym_char,
 										  attrflags,(method)NULL,(method)NULL,calcoffset(t_jit_freenect_grab,clear_depth));
 	jit_attr_addfilterset_clip(attr,0,1,TRUE,TRUE);
@@ -444,6 +458,10 @@ t_jit_err jit_freenect_grab_init(void)
 	
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"mode",_jit_sym_char,
 										  attrflags,(method)NULL,(method)jit_freenect_grab_set_mode,calcoffset(t_jit_freenect_grab,mode));
+	jit_class_addattr(_jit_freenect_grab_class,attr);
+	
+	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"format",_jit_sym_atom,
+										  attrflags,(method)NULL,(method)jit_freenect_grab_set_format,calcoffset(t_jit_freenect_grab,format));
 	jit_class_addattr(_jit_freenect_grab_class,attr);
 	
 	attr = (t_jit_object *)jit_object_new(_jit_sym_jit_attr_offset,"tilt",_jit_sym_long,
@@ -508,6 +526,7 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->type = NULL;
 		x->threshold = 2.f;
 		x->rgb = NULL;
+		jit_atom_setsym(&x->format, s_rgb);
 		
 	} else {
 		x = NULL;
@@ -523,7 +542,7 @@ void jit_freenect_grab_free(t_jit_freenect_grab *x)
 		free(x->lut.f_ptr);
 	}
 	
-	release_cloud(&x->cloud);
+	//release_cloud(&x->cloud);
 }
 
 t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
@@ -549,6 +568,57 @@ t_jit_err jit_freenect_grab_get_ndevices(t_jit_freenect_grab *x, void *attr, lon
 	jit_atom_setlong(*av,x->ndevices);
 	
 	return JIT_ERR_NONE;
+}
+
+void jit_freenect_grab_set_format(t_jit_freenect_grab *x,  void *attr, long argc, t_atom *argv){
+	if(argc){
+		t_atom a;
+		if(argv->a_type == A_SYM){
+			if((argv->a_w.w_sym == s_rgb)||((argv->a_w.w_sym == s_RGB))){
+				jit_atom_setsym(&a, s_rgb);
+			}
+			else if((argv->a_w.w_sym == s_ir)||((argv->a_w.w_sym == s_IR))){
+				jit_atom_setsym(&a, s_ir);
+			}
+			else{
+				error("Invalid output format: %s", argv->a_w.w_sym->s_name);
+				return;
+			}
+		}
+		else{
+			long v = jit_atom_getlong(argv);
+			if(v <= 0){
+				jit_atom_setsym(&a, s_rgb);
+			}
+			else{
+				jit_atom_setsym(&a, s_ir);
+			}
+		}
+		if(argv->a_w.w_sym == x->format.a_w.w_sym)return;
+		
+		x->format = a;
+		
+		if(x->device){
+			/*
+			if(x->format.a_w.w_sym == s_ir){
+				freenect_set_video_format(x->device, FREENECT_VIDEO_IR_8BIT);
+			}
+			else{
+				freenect_set_video_format(x->device, FREENECT_VIDEO_RGB);
+			}
+			*/
+			/*
+			t_atom arg;
+			jit_atom_setlong(&arg, x->index);
+			jit_freenect_grab_close(x, NULL, 0, NULL);
+			jit_freenect_grab_open(x, NULL, 1, &arg);
+			 */
+			//jit_freenect_grab_close(x, NULL, 0, NULL);
+			post("jit.freenect.grab: Cannot change output format while running. Please close and re-open device to activate change.");
+		}
+		
+		
+	}
 }
 
 t_jit_err jit_freenect_grab_get_accel(t_jit_freenect_grab *x, void *attr, long *ac, t_atom **av){
@@ -615,7 +685,7 @@ t_jit_err jit_freenect_grab_set_mode(t_jit_freenect_grab *x, void *attr, long ac
 		long mode = jit_atom_getlong(av);
 		
 		CLIP(mode, 0, 3);  // <-- See explanation in build_geometry implementation as to why I'm blocking point cloud output for now - jmp 2011-01-11
-		
+		/*
 		if(mode == 4){
 			if(!x->cloud.points){
 				allocate_cloud(&x->cloud);
@@ -634,6 +704,7 @@ t_jit_err jit_freenect_grab_set_mode(t_jit_freenect_grab *x, void *attr, long ac
 				x->rgb = NULL;
 			}
 		}
+		*/
 		
 		calculate_lut(&x->lut, x->lut_type, mode);
 		
@@ -749,14 +820,18 @@ void jit_freenect_grab_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_a
 	
 	freenect_set_depth_callback(x->device, depth_callback);
 	freenect_set_video_callback(x->device, rgb_callback);
-	freenect_set_video_format(x->device, FREENECT_VIDEO_RGB);
-	
+	if(x->format.a_w.w_sym == s_ir){
+		freenect_set_video_format(x->device, FREENECT_VIDEO_IR_8BIT);
+	}
+	else{
+		freenect_set_video_format(x->device, FREENECT_VIDEO_RGB);
+	}
 	//Store a pointer to this object in the freenect device struct (for use in callbacks)
 	freenect_set_user(x->device, x);  
 	
 	freenect_set_led(x->device,LED_RED);
 	
-	freenect_set_tilt_degs(x->device,x->tilt);
+	//freenect_set_tilt_degs(x->device,x->tilt);
 	
 	freenect_start_depth(x->device);
 	freenect_start_video(x->device);
@@ -802,11 +877,28 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 			goto out;
 		}
 		
+		if(x->device->video_format == FREENECT_VIDEO_IR_8BIT){
+			if(rgb_minfo.planecount != 1){
+				rgb_minfo.planecount = 1;
+				jit_object_method(rgb_matrix, _jit_sym_setinfo, &rgb_minfo);
+				jit_object_method(rgb_matrix, _jit_sym_getinfo, &rgb_minfo);
+			}
+		}
+		else{
+			if(rgb_minfo.planecount != 4){
+				rgb_minfo.planecount = 4;
+				jit_object_method(rgb_matrix, _jit_sym_setinfo, &rgb_minfo);
+				jit_object_method(rgb_matrix, _jit_sym_getinfo, &rgb_minfo);
+			}
+		}
+		
+		/*
 		if (rgb_minfo.planecount != 4) //overkill, but you can never be too sure
 		{
 			err=JIT_ERR_MISMATCH_PLANE;
 			goto out;
 		}
+		 */
 		
 		if(x->type==NULL){
 			x->type = depth_minfo.type;
@@ -850,12 +942,12 @@ t_jit_err jit_freenect_grab_matrix_calc(t_jit_freenect_grab *x, void *inputs, vo
 			}
 			
 			if(x->have_depth_frames){
-				if(x->mode == 4){
-					build_geometry(x, depth_matrix, depth_bp, &depth_minfo);
-				}
-				else{
+				//if(x->mode == 4){
+				//	build_geometry(x, depth_matrix, depth_bp, &depth_minfo);
+				//}
+				//else{
 					copy_depth_data(x->depth_data, depth_bp, &depth_minfo, &x->lut);
-				}
+				//}
 				x->have_depth_frames = 0;
 				x->has_frames = 1;
 			}
@@ -932,7 +1024,7 @@ void copy_depth_data(uint16_t *source, char *out_bp, t_jit_matrix_info *dest_inf
  point cloud matrix. This is why, for the moment I'm leaving the code, but leaving it unaccessible, as it's
  near useless as it is. jmp - 2011-01-10
 */
-
+/*
 void build_geometry(t_jit_freenect_grab *x, void *matrix, char *out_bp, t_jit_matrix_info *dest_info){
 	int i,i2,j;
 	uint16_t *in, *in2;
@@ -1057,6 +1149,7 @@ void build_geometry(t_jit_freenect_grab *x, void *matrix, char *out_bp, t_jit_ma
 	jit_object_method(matrix,_jit_sym_data,cloud->points);
 	
 }
+*/
 
 void copy_rgb_data(uint8_t *source, char *out_bp, t_jit_matrix_info *dest_info)
 {
@@ -1076,16 +1169,29 @@ void copy_rgb_data(uint8_t *source, char *out_bp, t_jit_matrix_info *dest_info)
 	
 	in = source;
 	
-	for(i=0;i<RGB_HEIGHT;i++){
-		out = out_bp + dest_info->dimstride[1] * i;
-		for(j=0;j<RGB_WIDTH;j++){
-			out[0] = 0xFF;
-			out[1] = in[0];
-			out[2] = in[1];
-			out[3] = in[2];
-			
-			out += 4;
-			in += 3;
+	if(dest_info->planecount == 4){
+		for(i=0;i<RGB_HEIGHT;i++){
+			out = out_bp + dest_info->dimstride[1] * i;
+			for(j=0;j<RGB_WIDTH;j++){
+				out[0] = 0xFF;
+				out[1] = in[0];
+				out[2] = in[1];
+				out[3] = in[2];
+				
+				out += 4;
+				in += 3;
+			}
+		}
+	}
+	else if(dest_info->planecount == 1){
+		for(i=0;i<RGB_HEIGHT;i++){
+			out = out_bp + dest_info->dimstride[1] * i;
+			for(j=0;j<RGB_WIDTH;j++){
+				*out = *in;
+				
+				out ++;
+				in ++;
+			}
 		}
 	}
 }
