@@ -89,8 +89,8 @@ typedef struct _jit_freenect_grab
 	long             tilt;
 	long             accelcount;
 	double           mks_accel[3];
-	uint8_t          *rgb_data;
-	uint16_t         *depth_data;
+	uint8_t          *rgb_data, *rgb_swap;
+	uint16_t         *depth_data, *depth_swap;
 	uint32_t         rgb_timestamp;
 	uint32_t         depth_timestamp;
 	char             have_depth_frames;
@@ -100,6 +100,8 @@ typedef struct _jit_freenect_grab
 	t_symbol         *type;
 	float            *rgb;
 	freenect_raw_tilt_state *state;
+    
+    pthread_mutex_t  cb_mutex;
 } t_jit_freenect_grab;
 
 typedef struct _obj_list
@@ -499,7 +501,7 @@ t_jit_err jit_freenect_grab_init(void)
 	for(i=0;i<480;i++){
 		ylut[i] = -0.393910475614942f * (((float)i - 239.5f) / 239.5f);
 	}
-		
+			
 	return JIT_ERR_NONE;
 }
 
@@ -507,7 +509,7 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 {
 	t_jit_freenect_grab *x;
 	
-	if (x=(t_jit_freenect_grab *)jit_object_alloc(_jit_freenect_grab_class))
+	if ((x=(t_jit_freenect_grab *)jit_object_alloc(_jit_freenect_grab_class)))
 	{
 		x->device = NULL;
 		x->timestamp = 0;
@@ -526,6 +528,8 @@ t_jit_freenect_grab *jit_freenect_grab_new(void)
 		x->type = NULL;
 		x->threshold = 2.f;
 		x->rgb = NULL;
+        
+        pthread_mutex_init(&x->cb_mutex, NULL);
 		jit_atom_setsym(&x->format, s_rgb);
 		
 	} else {
@@ -821,11 +825,16 @@ void jit_freenect_grab_open(t_jit_freenect_grab *x,  t_symbol *s, long argc, t_a
 	freenect_set_depth_callback(x->device, depth_callback);
 	freenect_set_video_callback(x->device, rgb_callback);
 	if(x->format.a_w.w_sym == s_ir){
-		freenect_set_video_format(x->device, FREENECT_VIDEO_IR_8BIT);
+		freenect_set_video_mode(x->device, freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_IR_8BIT));
 	}
 	else{
-		freenect_set_video_format(x->device, FREENECT_VIDEO_RGB);
+		freenect_set_video_mode(x->device, freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB));
 	}
+	
+	
+	freenect_set_depth_mode(x->device, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_11BIT));
+	//freenect_set_video_buffer(x->device, rgb_back);
+	
 	//Store a pointer to this object in the freenect device struct (for use in callbacks)
 	freenect_set_user(x->device, x);  
 	
@@ -1202,10 +1211,14 @@ void rgb_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
 	x = freenect_get_user(dev);
 	
 	if(!x)return;
+    
+    pthread_mutex_lock(&x->cb_mutex);
 	
 	x->rgb_data = pixels;
 	x->rgb_timestamp = timestamp;
 	x->have_rgb_frames++;
+    
+    pthread_mutex_unlock(&x->cb_mutex);
 }
 
 void depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
@@ -1214,8 +1227,12 @@ void depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
 	x = freenect_get_user(dev);
 	
 	if(!x)return;
+    
+    pthread_mutex_lock(&x->cb_mutex);
 	
 	x->depth_data = pixels;
 	x->depth_timestamp = timestamp;
 	x->have_depth_frames++;
+    
+    pthread_mutex_unlock(&x->cb_mutex);
 }
